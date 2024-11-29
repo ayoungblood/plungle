@@ -23,8 +23,8 @@ RADIO_NAME = "Retevis RT3S (OpenGD77)"
 # - TS2_TA_Tx ID: ???, "Off" for digital channels, blank for analog channels
 # - RX Tone: None, or CTCSS frequency in Hz, blank for digital channels
 # - TX Tone: None, or CTCSS frequency in Hz, blank for digital channels
-# - Squelch: blank for digital channels, generally None for analog channels
-# - Power: [P3,P6,P9] or Master
+# - Squelch: blank for digital channels, None, Disabled, Open, 5%-95%, or Closed for analog channels
+# - Power: P1-P9, -W+, or Master
 # - Rx Only: [Yes, No]
 # - Zone Skip: skip channel in zone scan, [Yes, No]
 # - All Skip: skip channel in all scan, [Yes, No]
