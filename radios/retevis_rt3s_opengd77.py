@@ -8,7 +8,7 @@ RADIO_NAME = "Retevis RT3S (OpenGD77)"
 
 # CSV Export Format:
 # Channels.csv
-# - Channel Number
+# - Channel Number: Channel Index
 # - Channel Name: 15 characters
 # - Channel Type: [Analogue, Digital]
 # - Rx Frequency: frequency in MHz, 5 decimal places
@@ -58,8 +58,8 @@ def parse_power_mw(power_str):
         return 4000
     if power_str == "P9":
         return 5000
-    if power_str == "-W+": # 5W+, map to 5W
-        return 5000
+    if power_str == "-W+": # 5W+, map to 6W
+        return 6000
     print(f"Warning: Unknown power level: {power_str}") # @TODO log this better
 
 def parse_tone(tone_str):
@@ -117,8 +117,8 @@ def csv2json(input_path):
                 channel["analog"] = {
                     "bandwidth_hz": RadioHelper.khzStr_to_hzInt(row["Bandwidth (kHz)"]),
                     "squelch": parse_squelch(row["Squelch"]),
-                    "rx_tone": parse_tone(row["RX Tone"]),
-                    "tx_tone": parse_tone(row["TX Tone"]),
+                    "tone_rx": parse_tone(row["RX Tone"]),
+                    "tone_tx": parse_tone(row["TX Tone"]),
                 }
             if channel["mode"] == "DMR":
                 channel["dmr"] = {
@@ -180,13 +180,16 @@ def csv2json(input_path):
         for row in csv_reader:
             tg_list = {
                 "name": row["TG List Name"],
-                "tgs": [],
+                "talkgroups": [],
             }
             tgs = []
             for ii in range(1, 32): # up to 32 contacts per talkgroup list
                 if row[f"Contact{ii}"]:
-                    tg_list["tgs"].append(row[f"Contact{ii}"])
+                    tg_list["talkgroups"].append(row[f"Contact{ii}"])
             json_data["talkgroup_lists"].append(tg_list)
     print(f"Parsed {len(json_data['talkgroup_lists']):4d} talkgroup lists...")
 
     return json_data
+
+def json2csv(json_data, output_path):
+    pass

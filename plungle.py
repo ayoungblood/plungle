@@ -21,6 +21,7 @@ def main():
     parser.add_argument("-D", "--dump", type=str, help="Comma separated options for what to dump to the console: all, chan, zone, tg, tgl, or channel number(s)")
     parser.add_argument("radio", choices=radio_models, help="Radio model")
     parser.add_argument("input", help="Input file or directory")
+    parser.add_argument("-o", "--output", help="Output file or directory", default="output")
     #parser.add_argument("output_path", help="Path to save the output (directory or file)")
 
     args = parser.parse_args()
@@ -33,51 +34,64 @@ def main():
     # Import the radio-specific module
     radio_module = __import__(f"radios.{args.radio}", fromlist=[""])
 
-    # Parse
-    codeplug_json = radio_module.csv2json(args.input)
+    if args.input.endswith(".json"):
+        # Export
+        radio_module.json2csv(args.input, args.output)
+    else:
+        # Parse
+        codeplug_json = radio_module.csv2json(args.input)
 
-    # Dump JSON data to the console
-    try: # catch exceptions so output can be piped without errors
-        if args.dump:
-            dump_options = args.dump.split(",")
-            for option in dump_options:
-                if "all" in option:
-                    print(json_lib.dumps(codeplug_json, indent=4))
-                elif option.startswith("ch"):
-                    print(json_lib.dumps(codeplug_json["channels"], indent=4))
-                elif option.startswith("z"):
-                    print(json_lib.dumps(codeplug_json["zones"], indent=4))
-                elif "tg" in option:
-                    print(json_lib.dumps(codeplug_json["talkgroups"], indent=4))
-                elif "tgl" in option:
-                    print(json_lib.dumps(codeplug_json["talkgroup_lists"], indent=4))
-                elif "-" in option: # range
-                    start, end = option.split("-")
-                    if not start.isnumeric() or not end.isnumeric():
-                        print(f"Invalid range: {option}")
-                        continue
-                    start, end = int(start), int(end)
-                    for channel in codeplug_json["channels"]:
-                        if start <= channel["index"] <= end:
-                            print(json_lib.dumps(channel, indent=4))
-                elif option.isnumeric():
-                    channel_number = int(option)
-                    found = False
-                    for channel in codeplug_json["channels"]:
-                        if channel["index"] == channel_number:
-                            print(json_lib.dumps(channel, indent=4))
-                            found = True
-                            break
-                    if not found:
-                        print(f"Channel {channel_number} not found, cannot dump")
+        # Dump JSON data to the console
+        try: # catch exceptions so output can be piped without errors
+            if args.dump:
+                dump_options = args.dump.split(",")
+                for option in dump_options:
+                    if "all" in option:
+                        print(json_lib.dumps(codeplug_json, indent=4))
+                    elif option.startswith("ch"):
+                        print(json_lib.dumps(codeplug_json["channels"], indent=4))
+                    elif option.startswith("z"):
+                        print(json_lib.dumps(codeplug_json["zones"], indent=4))
+                    elif "tg" in option:
+                        print(json_lib.dumps(codeplug_json["talkgroups"], indent=4))
+                    elif "tgl" in option:
+                        print(json_lib.dumps(codeplug_json["talkgroup_lists"], indent=4))
+                    elif "-" in option: # range
+                        start, end = option.split("-")
+                        if not start.isnumeric() or not end.isnumeric():
+                            print(f"Invalid range: {option}")
+                            continue
+                        start, end = int(start), int(end)
+                        for channel in codeplug_json["channels"]:
+                            if start <= channel["index"] <= end:
+                                print(json_lib.dumps(channel, indent=4))
+                    elif option.isnumeric():
+                        channel_number = int(option)
+                        found = False
+                        for channel in codeplug_json["channels"]:
+                            if channel["index"] == channel_number:
+                                print(json_lib.dumps(channel, indent=4))
+                                found = True
+                                break
+                        if not found:
+                            print(f"Channel {channel_number} not found, cannot dump")
 
-    except BrokenPipeError:
-        sys.stderr.close()
+        except BrokenPipeError:
+            sys.stderr.close()
 
-    # Validate JSON
-    if not validate(codeplug_json):
-        print("Error: Invalid JSON data.")
-        return
+        # Validate JSON
+        if not validate(codeplug_json):
+            print("Error: Invalid JSON data.")
+            #return
+
+        # Write JSON
+        json_path = args.output if args.output.endswith(".json") else f"{args.output}.json"
+        if os.path.exists(json_path):
+            print(f"Error: {args.output} already exists.")
+            return
+        with open(json_path, 'w') as json_file:
+            json_lib.dump(codeplug_json, json_file, indent=4)
+
 
 if __name__ == "__main__":
     # Handle SIGPIPE signal

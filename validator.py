@@ -33,6 +33,9 @@ def validate(json_data):
     # Validate zones
     if "zones" in json_data:
         for zone in json_data["zones"]:
+            if len(zone["channels"]) < 1:
+                lh.cprint(lh.ANSI_C_YLW, f"(validate) Warning: Zone {zone['name']} has no channels")
+        for zone in json_data["zones"]:
             for channel in zone["channels"]:
                 # Search for channel by name in the list of channels
                 found = False
