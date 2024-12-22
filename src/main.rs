@@ -1,6 +1,13 @@
+// src/main.rs
+
 use std::error::Error;
 use std::path::Path;
 use structopt::StructOpt;
+
+mod frequency;
+mod power;
+mod radios;
+mod structures;
 
 // plungle - Radio codeplug conversion tool
 // Usage: plungle [options] <radio> <input>
@@ -39,6 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // all output except the actual codeplug data should go to stderr
     dprintln!(opt.verbose, 1, "Welcome to the plungle, we got fun and games");
+    dprintln!(opt.verbose, 3, "{:?}", opt);
 
     // print the radio model
     dprintln!(opt.verbose, 1, "Radio model: {}", opt.radio);
@@ -51,14 +59,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     dprintln!(opt.verbose, 1, "Input path: {}", opt.input.display());
 
-    let input_is_dir = opt.input.is_dir();
+    let input_is_yaml = opt.input.is_file() && opt.input.extension().unwrap_or_default() == "yaml";
 
-    // determine operation
-    if input_is_dir && opt.radio == "anytone_x78" {
-        eprintln!("Converting Anytone x78 CSV export to YAML");
-    } else {
-        eprintln!("Cannot infer operation for radio model {} and input path {}", opt.radio, opt.input.display());
-        std::process::exit(1);
+    if input_is_yaml { // input is a YAML file, we are generating a codeplug export
+        dprintln!(opt.verbose, 1, "Parsing YAML file...");
+        let yaml = std::fs::read_to_string(&opt.input)?;
+        // let codeplug: structures::Codeplug = serde_yaml::from_str(&yaml)?;
+        dprintln!(opt.verbose, 3, "{:?}", yaml);
+    } else { // input is not YAML, we are parsing a codeplug export
+        dprintln!(opt.verbose, 1, "Parsing codeplug export...");
+        let codeplug = radios::parse(&opt.radio, &opt.input)?;
+        dprintln!(opt.verbose, 3, "{:?}", codeplug);
     }
 
     // print the dump option
