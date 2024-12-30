@@ -8,6 +8,50 @@ Please also see [qdmr](https://dm3mat.darc.de/qdmr/), a tool by DM3MAT that reve
 
 ## Usage
 
+Read a CSV export of a codeplug
+
+```
+plungle read <radio-a> <export-dir> > codeplug.yaml
+```
+
+Validate the codeplug
+
+```
+plungle validate codeplug.yaml
+```
+
+Write a codeplug for a different radio
+
+```
+plungle write <radio-b> codeplug.yaml <output-dir>
+```
+
+### Example
+
+For this example, we are going to convert an Anytone D878 codeplug to an OpenGD77 codeplug.
+
+First, you must open the codeplug in the Anytone CPS and export to CSV (in this example, the export directory is called `anytone_csv`).
+
+Read the exported codeplug (plungle uses YAML as an intermediary data format):
+
+```
+plungle read anytone-d878 anytone_csv > codeplug.yaml
+```
+
+Optionally, validate the parsed codeplug, this does some quick checks and warns if anything seems amiss.
+
+```
+plungle validate codeplug.yaml
+```
+
+Write the codeplug export files for the target radio (where `output` is a directory that will be  created containing CSV files to be imported into the OpenGD77 CPS):
+
+```
+plungle write opengd77-rt3s codeplug.yaml output
+```
+
 ## Documentation
+
+Complete documentation is not yet written.
 
 ## Issues
