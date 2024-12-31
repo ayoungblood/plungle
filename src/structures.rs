@@ -1,56 +1,69 @@
 // src/structures.rs
 
 use serde::{Deserialize, Serialize};
-use crate::frequency::Frequency;
-use crate::power::Power;
 
 /// Channel mode
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub enum ChannelMode {
     AM,
     FM,
     DMR,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+/// Channel FM properties
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct FM {
+    pub bandwidth: rust_decimal::Decimal,
+    pub squelch: String,
+    pub tone_rx: String,
+    pub tone_tx: String,
+}
+
+/// Channel DMR properties
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct DMR {
+    pub timeslot: u8,
+    pub color_code: u8,
+    pub talkgroup: String,
+}
+
+/// Channel
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Channel {
     pub index: u32,
     pub name: String,
     pub mode: ChannelMode,
-    pub frequency_rx: Frequency,
-    pub frequency_tx: Frequency,
+    pub frequency_rx: rust_decimal::Decimal,
+    pub frequency_tx: rust_decimal::Decimal,
     pub rx_only: bool,
-    pub power: Power,
-    // FM specific fields
-    pub bandwidth: Option<Frequency>,
-    pub squelch: Option<String>,
-    pub tone_rx: Option<String>,
-    pub tone_tx: Option<String>,
-    // DMR specific fields
-    pub timeslot: Option<u8>,
-    pub color_code: Option<u8>,
-    pub talkgroup: Option<Talkgroup>,
+    pub power: rust_decimal::Decimal,
+    pub fm: Option<FM>,
+    pub dmr: Option<DMR>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+/// Zone
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Zone {
     pub name: String,
     pub channels: Vec<Channel>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+/// Talkgroup
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Talkgroup {
     pub id: u32,
     pub name: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+/// Talkgroup List
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct TalkgroupList {
     pub name: String,
     pub talkgroups: Vec<Talkgroup>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+/// Codeplug
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Codeplug {
     pub channels: Vec<Channel>,
     pub zones: Vec<Zone>,

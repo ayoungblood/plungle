@@ -4,10 +4,13 @@ use std::error::Error;
 //use std::path::Path;
 use structopt::StructOpt;
 
+mod helpers;
 // mod frequency;
 // mod power;
-// mod radios;
-// mod structures;
+mod radios;
+mod structures;
+
+use helpers::*;
 
 // plungle - Radio codeplug conversion tool
 // Usage: plungle [options] <operation> [<args>]
@@ -31,36 +34,75 @@ struct Opt {
     #[structopt(name = "output", parse(from_os_str))]
     output: Option<std::path::PathBuf>,
 
+    /// Dump
+    #[structopt(short, long)]
+    dump: Option<String>,
+
     /// Verbose mode (-v, -vv, -vvv)
     #[structopt(short, long, parse(from_occurrences))]
     verbose: u8,
 }
 
-// debug print
-macro_rules! dprintln {
-    ($opt_verbose:expr, $message_verbose:expr, $($arg:tt)*) => {
-        if $opt_verbose >= $message_verbose {
-            eprintln!($($arg)*);
+fn dump(codeplug: &structures::Codeplug, opt: &Opt) -> Result<structures::Codeplug, Box<dyn Error>> {
+    let mut new_codeplug = structures::Codeplug {
+        channels: Vec::new(),
+        zones: Vec::new(),
+        lists: Vec::new(),
+    };
+    // we are dumping everything
+    if opt.dump.is_none() || opt.dump.as_ref().unwrap() == "all" {
+        new_codeplug = codeplug.clone();
+    } else {
+        let dump = opt.dump.as_ref().unwrap();
+        // split dump string into a vector
+        let dump_vec: Vec<&str> = dump.split(',').collect();
+        for dd in dump_vec {
+            dprintln!(opt.verbose, 3, "Processing dump item: {}", dd);
+            // if a dump argument starts with c, it applies to channels
+            if dd.starts_with("c") { // channels
+                if dd.contains("-") {
+                    let range: Vec<&str> = dd.trim_start_matches('c').split('-').collect();
+                    dprintln!(opt.verbose, 3, "Range: {:?}", range);
+                } else {
+                    let index = dd.trim_start_matches("c").parse::<usize>().unwrap();
+                    dprintln!(opt.verbose, 3, "Index: {}", index);
+                }}
         }
+        cprintln!(ANSI_C_YLW, "Unsupported dump type: {}", dump);
     }
+    // dump to JSON (@TODO add support for YAML/TOML)
+    let json = serde_json::to_string_pretty(&new_codeplug)?;
+    println!("{}", json);
+    eprintln!("Codeplug has {} channels, {} zones, and {} lists", new_codeplug.channels.len(), new_codeplug.zones.len(), new_codeplug.lists.len());
+    return Ok(new_codeplug);
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
     // all output except the actual codeplug data should go to stderr
-    dprintln!(opt.verbose, 1, "Welcome to the plungle, we got fun and games");
+    dprintln!(opt.verbose, 1, "Welcome to the plungle, we got fun and games!");
     dprintln!(opt.verbose, 3, "{:?}", opt);
 
+    let mut codeplug = structures::Codeplug {
+        channels: Vec::new(),
+        zones: Vec::new(),
+        lists: Vec::new(),
+    };
     // parse the operation
-    dprintln!(opt.verbose, 1, "Operation: {}", opt.operation);
-    if let Some(radio) = &opt.radio {
-        dprintln!(opt.verbose, 1, "Radio model: {}", radio);
-    }
     if opt.operation == "read" || opt.operation == "r" {
-        eprintln!("Reading codeplug...");
+        // read() validates the radio model and input path
+        codeplug = radios::read_codeplug(&opt)?;
+        // dump codeplug
+        codeplug = dump(&codeplug, &opt)?;
     } else if opt.operation == "write" || opt.operation == "w" {
+        // make sure we have a radio model
+        if opt.radio.is_none() {
+            eprintln!("Radio model is required for operation: write");
+            std::process::exit(1);
+        }
         eprintln!("Writing codeplug...");
+        eprintln!("Output path: {}", opt.output.as_ref().unwrap().display());
     } else if opt.operation == "validate" || opt.operation == "v" {
         eprintln!("Validating codeplug...");
     } else if opt.operation == "filter" || opt.operation == "f" {
@@ -69,30 +111,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         eprintln!("Invalid operation: {}", opt.operation);
         std::process::exit(1);
     }
-
-    // // print the radio model
-    // dprintln!(opt.verbose, 1, "Radio model: {}", opt.radio);
-
-    // // input can be a file or a directory, check if it it exists
-    // if !Path::new(&opt.input).exists() {
-    //     eprintln!("Input path does not exist: {}", opt.input.display());
-    //     std::process::exit(1);
-    // }
-
-    // dprintln!(opt.verbose, 1, "Input path: {}", opt.input.display());
-
-    // let input_is_yaml = opt.input.is_file() && opt.input.extension().unwrap_or_default() == "yaml";
-
-    // if input_is_yaml { // input is a YAML file, we are generating a codeplug export
-    //     dprintln!(opt.verbose, 1, "Parsing YAML file...");
-    //     let yaml = std::fs::read_to_string(&opt.input)?;
-    //     // let codeplug: structures::Codeplug = serde_yaml::from_str(&yaml)?;
-    //     dprintln!(opt.verbose, 3, "{:?}", yaml);
-    // } else { // input is not YAML, we are parsing a codeplug export
-    //     dprintln!(opt.verbose, 1, "Parsing codeplug export...");
-    //     let codeplug = radios::parse(&opt.radio, &opt.input)?;
-    //     dprintln!(opt.verbose, 3, "{:?}", codeplug);
-    // }
 
     eprintln!("Completed with {} errors, {} warnings. Have a nice day!", 0, 0);
     Ok(())

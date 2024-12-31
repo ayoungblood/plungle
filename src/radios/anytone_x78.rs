@@ -1,12 +1,21 @@
 // src/radios/anytone_x78.rs
+// reference https://burntsushi.net/csv/ for CSV parsing technique
 
-use std::path::Path;
+// use std::path::Path;
 use std::error::Error;
-use csv::{Reader, Result as CsvResult, Trim};
+// use csv::{Reader, Result as CsvResult, Trim};
+use std::collections::HashMap;
+use crate::Opt;
+use rust_decimal::prelude::*;
 
-use crate::frequency::Frequency;
-use crate::power::Power;
-use crate::structures::{ChannelMode, Channel, Zone, Talkgroup, TalkgroupList, Codeplug};
+// use crate::frequency::Frequency;
+// use crate::power::Power;
+// use crate::structures::{ChannelMode, Channel, Zone, Talkgroup, TalkgroupList, Codeplug};
+use crate::structures::{ChannelMode, FM, DMR, Channel, Codeplug};
+
+use crate::dprintln;
+use crate::cprintln;
+use crate::function;
 
 // CSV Export Format:
 // Channel.CSV
@@ -109,128 +118,111 @@ use crate::structures::{ChannelMode, Channel, Zone, Talkgroup, TalkgroupList, Co
 // - B Channel TX Frequency: TX frequency in MHz of selected channel in zone
 // - Zone Hide: [0, ???]
 
-pub fn parse(input: &Path) -> Result<Codeplug, Box<dyn Error>> {
+type CsvChannel = HashMap<String, String>;
 
-    let codeplug = Codeplug {
+pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
+    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+
+    let mut codeplug = Codeplug {
         channels: Vec::new(),
         zones: Vec::new(),
         lists: Vec::new(),
     };
 
+    // check that the input path is a directory
+    let input_path = match &opt.input {
+        Some(path) => {
+            if path.is_dir() {
+                path
+            } else {
+                cprintln!(31, "You lied to me when you told me this was a directory: {}", path.display());
+                return Err("Bad input path".into());
+            }
+        }
+        None => return Err("Bad input path".into()),
+    };
+
     // Check for Channel.CSV
-    let channel_path = format!("{}/Channel.CSV", input.display());
+    let channel_path = format!("{}/Channel.CSV", input_path.display());
     if !std::path::Path::new(&channel_path).exists() {
         return Err("Channel.CSV not found".into());
     } else {
-        let file = std::fs::File::open(channel_path)?;
-        let mut reader = csv::Reader::from_reader(file);
-        let headers: Option<Vec<String>> = None;
-        for result in reader.records() {
-            let record = result?;
-            if headers.is_none() {
-                return Err("CSV file does not contain headers".into());
-            }
-            let channel = parse_channel_record(&headers.as_ref().unwrap(), &record)?;
-            println!("{:?}", channel);
+        dprintln!(opt.verbose, 3, "Reading {}", channel_path);
+        let mut reader = csv::Reader::from_path(channel_path)?;
+        for result in reader.deserialize() {
+            let record: CsvChannel = result?;
+            // convert from CSV record to Channel struct
+            let channel = parse_channel_record(&record)?;
+            // append to codeplug.channels
+            codeplug.channels.push(channel);
         }
     }
 
-    // Check for Zone.CSV
-    let zone_path = format!("{}/Zone.CSV", input.display());
-    if !std::path::Path::new(&zone_path).exists() {
-        return Err("Zone.CSV not found".into());
-    } else {
-        let file = std::fs::File::open(zone_path)?;
-        let _reader = csv::Reader::from_reader(file);
+    // // Check for Zone.CSV
+    // let zone_path = format!("{}/Zone.CSV", input.display());
+    // if !std::path::Path::new(&zone_path).exists() {
+    //     return Err("Zone.CSV not found".into());
+    // } else {
+    //     let file = std::fs::File::open(zone_path)?;
+    //     let _reader = csv::Reader::from_reader(file);
 
-    }
+    // }
 
     Ok(codeplug)
 }
 
-fn parse_channel_record(
-    headers: &[String],
-    record: &csv::StringRecord,
-) -> Result<Channel, Box<dyn Error>> {
+// Convert the CSV channel hashmap into a Channel struct
+fn parse_channel_record(csv_channel: &CsvChannel) -> Result<Channel, Box<dyn Error>> {
     let mut channel = Channel {
         index: 0,
         name: String::new(),
         mode: ChannelMode::AM, // Default mode
-        frequency_rx: Frequency::from_mhz(0.0),
-        frequency_tx: Frequency::from_mhz(0.0),
+        frequency_rx: Decimal::new(0,0),
+        frequency_tx: Decimal::new(0,0),
         rx_only: false,
-        power: Power::from_w(0.0),
-        bandwidth: None,
-        squelch: None,
-        tone_rx: None,
-        tone_tx: None,
-        timeslot: None,
-        color_code: None,
-        talkgroup: None,
+        power: Decimal::new(0,0),
+        fm: None,
+        dmr: None,
     };
 
-    for (i, field) in record.iter().enumerate() {
-        match headers.get(i) {
-            Some(header) => {
-                match header.as_str() {
-                    "No.:" => channel.index = field.parse::<u32>()?,
-                    "Channel Name:" => channel.name = field.to_string(),
-                    "Channel Type:" => match field {
-                        "A-Analog" => channel.mode = ChannelMode::AM,
-                        "D-Digital" => channel.mode = ChannelMode::DMR,
-                        _ => return Err(format!("Unknown channel type: {}", field).into()),
-                    },
-                    "Receive Frequency:" => {
-                        channel.frequency_rx = Frequency::from_mhz(field.parse::<f64>()?)
-                    }
-                    "Transmit Frequency:" => {
-                        channel.frequency_tx = Frequency::from_mhz(field.parse::<f64>()?)
-                    }
-                    "Transmit Power:" => match field {
-                        "Turbo" => channel.power = Power::from_mw(500.0),
-                        "High" => channel.power = Power::from_mw(500.0),
-                        "Med" => channel.power = Power::from_mw(500.0),
-                        "Low" => channel.power = Power::from_mw(500.0),
-                        _ => return Err(format!("Unknown power level: {}", field).into()),
-                    },
-                    "Band Width:" => {
-                        channel.bandwidth = Some(Frequency::from_khz(field.parse::<f64>()?))
-                    }
-                    "Squelch Mode:" => channel.squelch = Some(field.to_string()),
-                    "CTCSS/DCS Decode:" | "CTCSS/DCS Encode:" => {
-                        if field != "Off" {
-                            channel.tone_rx = Some(field.to_string());
-                        }
-                    }
-                    "Contact TG/DMR ID:" => {
-                        if !field.is_empty() {
-                            let id = field.parse::<u32>()?;
-                            channel.talkgroup = Some(Talkgroup{id, name: String::new()});
-                        }
-                    }
-                    "Color Code:" => {
-                        if !field.is_empty() {
-                            channel.color_code = Some(field.parse::<u8>()?);
-                        }
-                    }
-                    "Slot:" => {
-                        if !field.is_empty() {
-                            channel.timeslot = Some(field.parse::<u8>()?);
-                        }
-                    }
-                    "PTT Prohibit:" => {
-                        channel.rx_only = field == "On";
-                    }
-                    // Handle other fields similarly, parsing values and updating the channel struct
-                    _ => {
-                        if !header.is_empty() {
-                            println!("Unhandled header: {}", header);
-                        }
-                    }
-                }
-            }
-            None => return Err("CSV record longer than headers".into()),
-        }
+    //eprintln!("{:#?}", csv_channel);
+
+    channel.index = csv_channel.get("No.").unwrap().parse::<u32>()?;
+    channel.name = csv_channel.get("Channel Name").unwrap().to_string();
+    channel.mode = match csv_channel.get("Channel Type").unwrap().as_str() {
+        "A-Analog" => ChannelMode::FM,
+        "D-Digital" => ChannelMode::DMR,
+        _ => return Err(format!("Unrecognized channel type: {}", csv_channel.get("Channel Type").unwrap()).into()),
+    };
+    channel.frequency_rx = Decimal::from_str(csv_channel.get("Receive Frequency").unwrap())? * Decimal::new(1_000_000, 0);
+    channel.frequency_tx = Decimal::from_str(csv_channel.get("Transmit Frequency").unwrap())? * Decimal::new(1_000_000, 0);
+    // rx_only @TODO
+    channel.power = match csv_channel.get("Transmit Power").unwrap().as_str() {
+        "Turbo" => Decimal::from_str("7.0").unwrap(),
+        "High" => Decimal::from_str("5.0").unwrap(),
+        "Med" => Decimal::from_str("2.5").unwrap(),
+        "Low" => Decimal::from_str("1.0").unwrap(),
+        _ => return Err(format!("Unrecognized power level: {}", csv_channel.get("Transmit Power").unwrap()).into()),
+    };
+    if channel.mode == ChannelMode::FM { // FM specific fields
+        channel.fm = Some(FM {
+            bandwidth: match csv_channel.get("Band Width").unwrap().as_str() {
+                "12.5K" => Decimal::from_str("12.5").unwrap() * Decimal::new(1_000, 0),
+                "25K" => Decimal::from_str("25.0").unwrap() * Decimal::new(1_000, 0),
+                _ => return Err(format!("Unrecognized bandwidth: {}", csv_channel.get("Band Width").unwrap()).into()),
+            },
+            squelch: "Carrier".to_string(), // @TODO
+            tone_rx: csv_channel.get("CTCSS/DCS Decode").unwrap().to_string(),
+            tone_tx: csv_channel.get("CTCSS/DCS Encode").unwrap().to_string(),
+        });
+    } else if channel.mode == ChannelMode::DMR { // DMR specific fields
+        channel.dmr = Some(DMR {
+            timeslot: csv_channel.get("Slot").unwrap().parse::<u8>()?,
+            color_code: csv_channel.get("Color Code").unwrap().parse::<u8>()?,
+            talkgroup: "none".to_string(), // @TODO
+        })
+    } else {
+        return Err("Unparsed channel mode".into());
     }
 
     Ok(channel)
