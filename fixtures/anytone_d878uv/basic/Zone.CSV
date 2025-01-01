@@ -1,1 +1,4 @@
 "No.","Zone Name","Zone Channel Member","Zone Channel Member RX Frequency","Zone Channel Member TX Frequency","A Channel","A Channel RX Frequency","A Channel TX Frequency","B Channel","B Channel RX Frequency","B Channel TX Frequency","Zone Hide "
+"1","VHF Zone","VHF Simplex|VHF Low CTCSS|VHF Mid DCS|VHF High Cross|VHF Turbo Cross|VHF CTCSS C260|VHF Dig Rep C1S1","146.52000|145.11500|145.13000|145.14500|145.16000|145.11500|145.11500","146.52000|144.51500|144.53000|144.54500|144.56000|144.51500|144.51500","VHF Simplex","146.52000","146.52000","VHF Low CTCSS","145.11500","144.51500","0"
+"2","Simplex Zone","VHF Simplex|UHF Simplex","146.52000|446.00000","146.52000|446.00000","VHF Simplex","146.52000","146.52000","UHF Simplex","446.00000","446.00000","0"
+"3","FRS","FRS 01 Narrow","462.56250","462.56250","FRS 01 Narrow","462.56250","462.56250","FRS 01 Narrow","462.56250","462.56250","0"
