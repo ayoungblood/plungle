@@ -1,21 +1,14 @@
 // src/radios/anytone_x78.rs
 // reference https://burntsushi.net/csv/ for CSV parsing technique
 
-// use std::path::Path;
 use std::error::Error;
-// use csv::{Reader, Result as CsvResult, Trim};
 use std::collections::HashMap;
 use crate::Opt;
 use rust_decimal::prelude::*;
 
-// use crate::frequency::Frequency;
-// use crate::power::Power;
-// use crate::structures::{ChannelMode, Channel, Zone, Talkgroup, TalkgroupList, Codeplug};
-use crate::structures::{ChannelMode, FM, DMR, Channel, Codeplug};
+use crate::structures::{ChannelMode, ToneMode, Tone, FM, DMR, Channel, Codeplug};
 
-use crate::dprintln;
-use crate::cprintln;
-use crate::function;
+use crate::*;
 
 // CSV Export Format:
 // Channel.CSV
@@ -24,7 +17,7 @@ use crate::function;
 // - Receive Frequency: frequency in MHz
 // - Transmit Frequency: frequency in MHz
 // - Channel Type: [A-Analog, D-Digital]
-// - Transmit Power: [Turbo, High, Med, Low], corresponding to ~7W, 5W, 2.5W, 1W
+// - Transmit Power: [Turbo, High, Mid, Low], corresponding to ~7W, 5W, 2.5W, 1W
 // - Band Width: [12.5K, 25K]
 // - CTCSS/DCS Decode: Off, or CTCSS/DCS frequency/code
 // - CTCSS/DCS Encode: Off, or CTCSS/DCS frequency/code
@@ -135,7 +128,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
             if path.is_dir() {
                 path
             } else {
-                cprintln!(31, "You lied to me when you told me this was a directory: {}", path.display());
+                cprintln!(ANSI_C_RED, "You lied to me when you told me this was a directory: {}", path.display());
                 return Err("Bad input path".into());
             }
         }
@@ -171,6 +164,30 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     Ok(codeplug)
 }
 
+// Convert a CTCSS/DCS string into a Tone struct
+// Anytone stores CTCSS/DCS as follows:
+// - "Off" for no tone
+// - "100" or "141.3" for CTCSS frequency (decimal point may or may not be present)
+// - "D023N" or "D023I" for DCS code (N for normal, I for inverted)
+fn parse_tone(tone: &str) -> Option<Tone> {
+    if tone == "Off" {
+        return None;
+    }
+    // if string begins with D, it's DCS
+    if tone.starts_with("D") {
+        return Some(Tone {
+            mode: ToneMode::DCS,
+            ctcss: None,
+            dcs: Some(tone.to_string()),
+        });
+    }
+    Some(Tone {
+        mode: ToneMode::CTCSS,
+        ctcss: Some(Decimal::from_str(tone).unwrap()),
+        dcs: None,
+    })
+}
+
 // Convert the CSV channel hashmap into a Channel struct
 fn parse_channel_record(csv_channel: &CsvChannel) -> Result<Channel, Box<dyn Error>> {
     let mut channel = Channel {
@@ -185,8 +202,6 @@ fn parse_channel_record(csv_channel: &CsvChannel) -> Result<Channel, Box<dyn Err
         dmr: None,
     };
 
-    //eprintln!("{:#?}", csv_channel);
-
     channel.index = csv_channel.get("No.").unwrap().parse::<u32>()?;
     channel.name = csv_channel.get("Channel Name").unwrap().to_string();
     channel.mode = match csv_channel.get("Channel Type").unwrap().as_str() {
@@ -196,11 +211,11 @@ fn parse_channel_record(csv_channel: &CsvChannel) -> Result<Channel, Box<dyn Err
     };
     channel.frequency_rx = Decimal::from_str(csv_channel.get("Receive Frequency").unwrap())? * Decimal::new(1_000_000, 0);
     channel.frequency_tx = Decimal::from_str(csv_channel.get("Transmit Frequency").unwrap())? * Decimal::new(1_000_000, 0);
-    // rx_only @TODO
+    channel.rx_only = csv_channel.get("PTT Prohibit").unwrap() == "On";
     channel.power = match csv_channel.get("Transmit Power").unwrap().as_str() {
         "Turbo" => Decimal::from_str("7.0").unwrap(),
         "High" => Decimal::from_str("5.0").unwrap(),
-        "Med" => Decimal::from_str("2.5").unwrap(),
+        "Mid" => Decimal::from_str("2.5").unwrap(),
         "Low" => Decimal::from_str("1.0").unwrap(),
         _ => return Err(format!("Unrecognized power level: {}", csv_channel.get("Transmit Power").unwrap()).into()),
     };
@@ -211,9 +226,9 @@ fn parse_channel_record(csv_channel: &CsvChannel) -> Result<Channel, Box<dyn Err
                 "25K" => Decimal::from_str("25.0").unwrap() * Decimal::new(1_000, 0),
                 _ => return Err(format!("Unrecognized bandwidth: {}", csv_channel.get("Band Width").unwrap()).into()),
             },
-            squelch: "Carrier".to_string(), // @TODO
-            tone_rx: csv_channel.get("CTCSS/DCS Decode").unwrap().to_string(),
-            tone_tx: csv_channel.get("CTCSS/DCS Encode").unwrap().to_string(),
+            squelch_level: 0, // @TODO
+            tone_rx: parse_tone(csv_channel.get("CTCSS/DCS Decode").unwrap().as_str()),
+            tone_tx: parse_tone(csv_channel.get("CTCSS/DCS Encode").unwrap().as_str()),
         });
     } else if channel.mode == ChannelMode::DMR { // DMR specific fields
         channel.dmr = Some(DMR {

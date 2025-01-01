@@ -10,13 +10,27 @@ pub enum ChannelMode {
     DMR,
 }
 
+/// Tone mode
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub enum ToneMode {
+    CTCSS,
+    DCS,
+}
+
+/// Tone
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct Tone {
+    pub mode: ToneMode,
+    pub ctcss: Option<rust_decimal::Decimal>,
+    pub dcs: Option<String>,
+}
 /// Channel FM properties
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct FM {
     pub bandwidth: rust_decimal::Decimal,
-    pub squelch: String,
-    pub tone_rx: String,
-    pub tone_tx: String,
+    pub squelch_level: u8, // squelch level as a percentage, 0-100
+    pub tone_rx: Option<Tone>,
+    pub tone_tx: Option<Tone>,
 }
 
 /// Channel DMR properties

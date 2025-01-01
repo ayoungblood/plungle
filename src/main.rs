@@ -62,13 +62,32 @@ fn dump(codeplug: &structures::Codeplug, opt: &Opt) -> Result<structures::Codepl
             if dd.starts_with("c") { // channels
                 if dd.contains("-") {
                     let range: Vec<&str> = dd.trim_start_matches('c').split('-').collect();
-                    dprintln!(opt.verbose, 3, "Range: {:?}", range);
+                    let start = range[0].parse::<usize>().unwrap();
+                    let end = range[1].parse::<usize>().unwrap();
+                    dprintln!(opt.verbose, 3, "Dump range: {}-{}", start, end);
+                    for ii in start..=end {
+                        // add channel by index to new codeplug
+                        for cc in codeplug.channels.iter() {
+                            if cc.index == ii as u32 {
+                                new_codeplug.channels.push(cc.clone());
+                            }
+                        }
+                    }
+
                 } else {
                     let index = dd.trim_start_matches("c").parse::<usize>().unwrap();
-                    dprintln!(opt.verbose, 3, "Index: {}", index);
-                }}
+                    dprintln!(opt.verbose, 3, "Dump index: {}", index);
+                    // add channel by index to new codeplug
+                    for cc in codeplug.channels.iter() {
+                        if cc.index == index as u32 {
+                            new_codeplug.channels.push(cc.clone());
+                        }
+                    }
+                }
+            } else {
+                cprintln!(ANSI_C_YLW, "Unsupported dump item: {}", dd);
+            }
         }
-        cprintln!(ANSI_C_YLW, "Unsupported dump type: {}", dump);
     }
     // dump to JSON (@TODO add support for YAML/TOML)
     let json = serde_json::to_string_pretty(&new_codeplug)?;
@@ -84,17 +103,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     dprintln!(opt.verbose, 1, "Welcome to the plungle, we got fun and games!");
     dprintln!(opt.verbose, 3, "{:?}", opt);
 
-    let mut codeplug = structures::Codeplug {
-        channels: Vec::new(),
-        zones: Vec::new(),
-        lists: Vec::new(),
-    };
     // parse the operation
     if opt.operation == "read" || opt.operation == "r" {
         // read() validates the radio model and input path
-        codeplug = radios::read_codeplug(&opt)?;
+        let codeplug = radios::read_codeplug(&opt)?;
         // dump codeplug
-        codeplug = dump(&codeplug, &opt)?;
+        dump(&codeplug, &opt)?;
     } else if opt.operation == "write" || opt.operation == "w" {
         // make sure we have a radio model
         if opt.radio.is_none() {

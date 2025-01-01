@@ -2,11 +2,11 @@
 
 // ANSI color codes
 pub const ANSI_C_RED: &str = "31";
-pub const ANSI_C_GRN: &str = "32";
+// pub const ANSI_C_GRN: &str = "32";
 pub const ANSI_C_YLW: &str = "33";
-pub const ANSI_C_BLU: &str = "34";
-pub const ANSI_C_MAG: &str = "35";
-pub const ANSI_C_CYN: &str = "36";
+// pub const ANSI_C_BLU: &str = "34";
+// pub const ANSI_C_MAG: &str = "35";
+// pub const ANSI_C_CYN: &str = "36";
 
 // debug print
 #[macro_export]

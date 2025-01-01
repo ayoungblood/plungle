@@ -11,19 +11,19 @@ Please also see [qdmr](https://dm3mat.darc.de/qdmr/), a tool by DM3MAT that reve
 Read a CSV export of a codeplug
 
 ```
-plungle read <radio-a> <export-dir> > codeplug.yaml
+plungle read <radio-a> <csv-export-dir> > codeplug.json
 ```
 
 Validate the codeplug
 
 ```
-plungle validate codeplug.yaml
+plungle validate codeplug.json
 ```
 
 Write a codeplug for a different radio
 
 ```
-plungle write <radio-b> codeplug.yaml <output-dir>
+plungle write <radio-b> codeplug.json <output-dir>
 ```
 
 ### Example
@@ -32,22 +32,22 @@ For this example, we are going to convert an Anytone D878 codeplug to an OpenGD7
 
 First, you must open the codeplug in the Anytone CPS and export to CSV (in this example, the export directory is called `anytone_csv`).
 
-Read the exported codeplug (plungle uses YAML as an intermediary data format):
+Read the exported codeplug (plungle uses JSON as an intermediary data format):
 
 ```
-plungle read anytone-d878 anytone_csv > codeplug.yaml
+plungle read anytone-d878 anytone_csv > codeplug.json
 ```
 
 Optionally, validate the parsed codeplug, this does some quick checks and warns if anything seems amiss.
 
 ```
-plungle validate codeplug.yaml
+plungle validate codeplug.json
 ```
 
 Write the codeplug export files for the target radio (where `output` is a directory that will be  created containing CSV files to be imported into the OpenGD77 CPS):
 
 ```
-plungle write opengd77-rt3s codeplug.yaml output
+plungle write opengd77-rt3s codeplug.json output
 ```
 
 ## Documentation
@@ -55,3 +55,9 @@ plungle write opengd77-rt3s codeplug.yaml output
 Complete documentation is not yet written.
 
 ## Issues
+
+## Future Plans
+
+* Support JSON, TOML, YAML, and CSV as intermediary data formats
+* Support Chirp input/output
+* Support merging multiple codeplugs

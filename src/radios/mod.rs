@@ -1,14 +1,9 @@
 // src/radios/mod.rs
 
-//use std::path::Path;
 use std::error::Error;
 use crate::Opt;
-
 use crate::structures::Codeplug;
-
-use crate::dprintln;
-use crate::cprintln;
-use crate::function;
+use crate::*;
 
 mod anytone_x78;
 
@@ -21,14 +16,14 @@ pub fn read_codeplug(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
     // validate the radio
     if opt.radio.is_none() {
-        cprintln!(31, "Radio model is required for operation: read");
+        cprintln!(ANSI_C_RED, "Radio model is required for operation: read");
         print_supported_radios();
         return Err("Bad radio model".into());
     }
     let radio_model = opt.radio.as_ref().unwrap();
     // validate the input path
     if opt.input.is_none() {
-        cprintln!(31, "Input path is required for operation: read");
+        cprintln!(ANSI_C_RED, "Input path is required for operation: read");
         return Err("Bad input path".into());
     }
 
@@ -36,7 +31,7 @@ pub fn read_codeplug(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     if "anytone_x78".contains(radio_model) {
         return anytone_x78::read(opt);
     } else {
-        cprintln!(31, "Unsupported radio model for operation: read");
+        cprintln!(ANSI_C_RED, "Unsupported radio model for operation: read");
         print_supported_radios();
         return Err("Bad radio model".into())
     }
