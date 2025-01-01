@@ -43,7 +43,8 @@ fn dump(codeplug: &structures::Codeplug, opt: &Opt) -> Result<structures::Codepl
     let mut new_codeplug = structures::Codeplug {
         channels: Vec::new(),
         zones: Vec::new(),
-        lists: Vec::new(),
+        talkgroups: Vec::new(),
+        talkgroup_lists: Vec::new(),
         config: None,
     };
     // we are dumping everything
@@ -89,7 +90,8 @@ fn dump(codeplug: &structures::Codeplug, opt: &Opt) -> Result<structures::Codepl
     // dump to JSON (@TODO add support for YAML/TOML)
     let json = serde_json::to_string_pretty(&new_codeplug)?;
     println!("{}", json);
-    eprintln!("Codeplug has {} channels, {} zones, and {} lists", new_codeplug.channels.len(), new_codeplug.zones.len(), new_codeplug.lists.len());
+    eprintln!("Codeplug has {} channels, {} zones, {} talkgroups, {} talkgroup lists",
+        new_codeplug.channels.len(), new_codeplug.zones.len(), new_codeplug.talkgroups.len(), new_codeplug.talkgroup_lists.len());
     return Ok(new_codeplug);
 }
 

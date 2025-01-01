@@ -26,7 +26,7 @@ pub struct Tone {
 }
 /// Channel FM properties
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct FM {
+pub struct FmChannel {
     pub bandwidth: rust_decimal::Decimal,
     pub squelch_level: u8, // squelch level as a percentage, 0-100
     pub tone_rx: Option<Tone>,
@@ -35,10 +35,11 @@ pub struct FM {
 
 /// Channel DMR properties
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct DMR {
+pub struct DmrChannel {
     pub timeslot: u8,
     pub color_code: u8,
-    pub talkgroup: String,
+    pub talkgroup: Option<String>,
+    pub talkgroup_list: Option<String>,
 }
 
 /// Channel
@@ -51,29 +52,38 @@ pub struct Channel {
     pub frequency_tx: rust_decimal::Decimal,
     pub rx_only: bool,
     pub power: rust_decimal::Decimal,
-    pub fm: Option<FM>,
-    pub dmr: Option<DMR>,
+    pub fm: Option<FmChannel>,
+    pub dmr: Option<DmrChannel>,
 }
 
-/// Zone
+/// Zone (a zone is a collection of channels)
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Zone {
     pub name: String,
     pub channels: Vec<u32>,
 }
 
-/// Talkgroup
+/// DMR TalkgroupCallType
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct Talkgroup {
-    pub id: u32,
-    pub name: String,
+pub enum DmrTalkgroupCallType {
+    Group,
+    Private,
+    AllCall,
 }
 
-/// Talkgroup List
+/// DMR Talkgroup
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct TalkgroupList {
+pub struct DmrTalkgroup {
+    pub id: u32,
     pub name: String,
-    pub talkgroups: Vec<Talkgroup>,
+    pub call_type: DmrTalkgroupCallType,
+}
+
+/// DMR Talkgroup List
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct DmrTalkgroupList {
+    pub name: String,
+    pub talkgroups: Vec<DmrTalkgroup>,
 }
 
 /// DMR ID
@@ -89,7 +99,7 @@ pub struct DmrConfiguration {
     pub id_list: Vec<DmrId>,
 }
 
-/// Configuration
+/// Configuration (radio options, settings, and user data/IDs/callsigns)
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Configuration {
     pub dmr_configuration: Option<DmrConfiguration>,
@@ -100,6 +110,7 @@ pub struct Configuration {
 pub struct Codeplug {
     pub channels: Vec<Channel>,
     pub zones: Vec<Zone>,
-    pub lists: Vec<TalkgroupList>,
+    pub talkgroups: Vec<DmrTalkgroup>,
+    pub talkgroup_lists: Vec<DmrTalkgroupList>,
     pub config: Option<Configuration>,
 }

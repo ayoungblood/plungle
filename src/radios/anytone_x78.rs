@@ -7,7 +7,7 @@ use crate::Opt;
 use rust_decimal::prelude::*;
 use std::path::PathBuf;
 
-use crate::structures::{ChannelMode, ToneMode, Tone, FM, DMR, Channel, Zone, DmrId, DmrConfiguration, Configuration, Codeplug};
+use crate::structures::{ChannelMode, ToneMode, Tone, FmChannel, DmrChannel, Channel, Zone, DmrId, DmrTalkgroupCallType, DmrTalkgroup, DmrTalkgroupList, DmrConfiguration, Configuration, Codeplug};
 
 use crate::*;
 
@@ -26,7 +26,7 @@ use crate::*;
 // - Contact Call Type: [Group Call, ???]
 // - Contact TG/DMR ID: DMR talkgroup ID
 // - Radio ID: Radio ID name (not DMR ID), generally callsign
-// - Busy Lock/TX Permit: [Off, Always, ???]
+// - Busy Lock/TX Permit: [Off, Always, Different CDT, Channel Free, Same Color Code, Different Color Code]
 // - Squelch Mode: [Carrier, CTCSS/DCS], Carrier for digital channels
 // - Optional Signal: Off
 // - DTMF ID: 1
@@ -124,7 +124,8 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     let mut codeplug = Codeplug {
         channels: Vec::new(),
         zones: Vec::new(),
-        lists: Vec::new(),
+        talkgroups: Vec::new(),
+        talkgroup_lists: Vec::new(),
         config: None,
     };
 
@@ -140,6 +141,68 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         }
         None => return Err("Bad input path".into()),
     };
+
+    // Check for TalkGroups.CSV
+    let mut talkgroups_path: PathBuf = input_path.clone();
+    talkgroups_path.push("TalkGroups.CSV");
+    // if TalkGroups.CSV doesn't exist, no problem, we just don't have any talkgroups
+    if talkgroups_path.exists() {
+        dprintln!(opt.verbose, 3, "Reading {}", talkgroups_path.display());
+        let mut reader = csv::Reader::from_path(talkgroups_path)?;
+        for result in reader.deserialize() {
+            let record: CsvRecord = result?;
+            // convert from CSV record to DmrTalkgroup struct
+            let talkgroup = DmrTalkgroup {
+                id: record.get("Radio ID").unwrap().parse::<u32>()?,
+                name: record.get("Name").unwrap().to_string(),
+                call_type: match record.get("Call Type").unwrap().as_str() {
+                    "Group Call" => DmrTalkgroupCallType::Group,
+                    "Private Call" => DmrTalkgroupCallType::Private,
+                    "All Call" => DmrTalkgroupCallType::AllCall,
+                    _ => return Err(format!("Unrecognized call type: {}", record.get("Call Type").unwrap()).into()),
+                },
+            };
+            // append to codeplug.talkgroups
+            codeplug.talkgroups.push(talkgroup);
+        }
+    }
+
+    // Check for ReceiveGroupCallList.CSV
+    let mut talkgroup_lists_path: PathBuf = input_path.clone();
+    talkgroup_lists_path.push("ReceiveGroupCallList.CSV");
+    // if this file doesn't exist, no problem, we just don't have any talkgroup lists
+    if talkgroup_lists_path.exists() {
+        dprintln!(opt.verbose, 3, "Reading {}", talkgroup_lists_path.display());
+        let mut reader = csv::Reader::from_path(talkgroup_lists_path)?;
+        for result in reader.deserialize() {
+            let record: CsvRecord = result?;
+            // convert from CSV record to DmrTalkgroupList struct
+            let talkgroup_list = DmrTalkgroupList {
+                name: record.get("Group Name").unwrap().to_string(),
+                talkgroups: Vec::new(),
+            };
+            // // Talkgroup names are stored as a list, separated by "|"
+            // let talkgroup_names: Vec<&str> = record.get("Contact").unwrap().split('|').collect();
+            // // Talkgroup IDs are stored as a list, separated by "|"
+            // let talkgroup_ids: Vec<&str> = record.get("Contact TG/DMR ID").unwrap().split('|').collect();
+            // for (name, id) in talkgroup_names.iter().zip(talkgroup_ids.iter()) {
+            //     let talkgroup = codeplug.talkgroups.iter().find(|&t| t.name == *name);
+            //     match talkgroup {
+            //         Some(t) => {
+            //             let talkgroup = DmrTalkgroup {
+            //                 id: t.id,
+            //                 name: t.name.clone(),
+            //                 call_type: t.call_type.clone(),
+            //             };
+            //             talkgroup_list.talkgroups.push(talkgroup);
+            //         },
+            //         None => return Err(format!("Talkgroup not found: {}", name).into()),
+            //     }
+            // }
+            // append to codeplug.talkgroup_lists
+            codeplug.talkgroup_lists.push(talkgroup_list);
+        }
+    }
 
     // Check for Channel.CSV
     let mut channel_path: PathBuf = input_path.clone();
@@ -257,7 +320,7 @@ fn parse_channel_record(csv_channel: &CsvRecord) -> Result<Channel, Box<dyn Erro
         _ => return Err(format!("Unrecognized power level: {}", csv_channel.get("Transmit Power").unwrap()).into()),
     };
     if channel.mode == ChannelMode::FM { // FM specific fields
-        channel.fm = Some(FM {
+        channel.fm = Some(FmChannel {
             bandwidth: match csv_channel.get("Band Width").unwrap().as_str() {
                 "12.5K" => Decimal::from_str("12.5").unwrap() * Decimal::new(1_000, 0),
                 "25K" => Decimal::from_str("25.0").unwrap() * Decimal::new(1_000, 0),
@@ -268,10 +331,11 @@ fn parse_channel_record(csv_channel: &CsvRecord) -> Result<Channel, Box<dyn Erro
             tone_tx: parse_tone(csv_channel.get("CTCSS/DCS Encode").unwrap().as_str()),
         });
     } else if channel.mode == ChannelMode::DMR { // DMR specific fields
-        channel.dmr = Some(DMR {
+        channel.dmr = Some(DmrChannel {
             timeslot: csv_channel.get("Slot").unwrap().parse::<u8>()?,
             color_code: csv_channel.get("Color Code").unwrap().parse::<u8>()?,
-            talkgroup: "none".to_string(), // @TODO
+            talkgroup: None, // @TODO
+            talkgroup_list: None, // @TODO
         })
     } else {
         return Err("Unparsed channel mode".into());
