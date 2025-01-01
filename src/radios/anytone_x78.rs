@@ -5,8 +5,9 @@ use std::error::Error;
 use std::collections::HashMap;
 use crate::Opt;
 use rust_decimal::prelude::*;
+use std::path::PathBuf;
 
-use crate::structures::{ChannelMode, ToneMode, Tone, FM, DMR, Channel, Codeplug};
+use crate::structures::{ChannelMode, ToneMode, Tone, FM, DMR, Channel, Zone, DmrId, DmrConfiguration, Configuration, Codeplug};
 
 use crate::*;
 
@@ -110,8 +111,12 @@ use crate::*;
 // - B Channel RX Frequency: RX frequency in MHz of selected channel in zone
 // - B Channel TX Frequency: TX frequency in MHz of selected channel in zone
 // - Zone Hide: [0, ???]
+// RadioIDList.CSV
+// - No.: radio ID index
+// - Radio ID: radio ID
+// - Name: radio ID name
 
-type CsvChannel = HashMap<String, String>;
+type CsvRecord = HashMap<String, String>;
 
 pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
@@ -120,6 +125,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         channels: Vec::new(),
         zones: Vec::new(),
         lists: Vec::new(),
+        config: None,
     };
 
     // check that the input path is a directory
@@ -136,14 +142,15 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     };
 
     // Check for Channel.CSV
-    let channel_path = format!("{}/Channel.CSV", input_path.display());
-    if !std::path::Path::new(&channel_path).exists() {
+    let mut channel_path: PathBuf = input_path.clone();
+    channel_path.push("Channel.CSV");
+    if !channel_path.exists() {
         return Err("Channel.CSV not found".into());
     } else {
-        dprintln!(opt.verbose, 3, "Reading {}", channel_path);
+        dprintln!(opt.verbose, 3, "Reading {}", channel_path.display());
         let mut reader = csv::Reader::from_path(channel_path)?;
         for result in reader.deserialize() {
-            let record: CsvChannel = result?;
+            let record: CsvRecord = result?;
             // convert from CSV record to Channel struct
             let channel = parse_channel_record(&record)?;
             // append to codeplug.channels
@@ -151,15 +158,45 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         }
     }
 
-    // // Check for Zone.CSV
-    // let zone_path = format!("{}/Zone.CSV", input.display());
-    // if !std::path::Path::new(&zone_path).exists() {
-    //     return Err("Zone.CSV not found".into());
-    // } else {
-    //     let file = std::fs::File::open(zone_path)?;
-    //     let _reader = csv::Reader::from_reader(file);
+    // Check for Zone.CSV
+    let mut zone_path: PathBuf = input_path.clone();
+    zone_path.push("Zone.CSV");
+    if !zone_path.exists() {
+        return Err("Zone.CSV not found".into());
+    } else {
+        dprintln!(opt.verbose, 3, "Reading {}", zone_path.display());
+        let mut reader = csv::Reader::from_path(zone_path)?;
+        for result in reader.deserialize() {
+            let record: CsvRecord = result?;
+            // convert from CSV record to Zone struct
+            let zone = parse_zone_record(&record, &codeplug)?;
+            // append to codeplug.zones
+            codeplug.zones.push(zone);
+        }
+    }
 
-    // }
+    // Check for RadioIDList.CSV
+    let mut radio_id_list_path: PathBuf = input_path.clone();
+    radio_id_list_path.push("RadioIDList.CSV");
+    // if this file doesn't exist, no problem, we just don't set the radio ID list
+    if radio_id_list_path.exists() {
+        dprintln!(opt.verbose, 3, "Reading {}", radio_id_list_path.display());
+        let mut reader = csv::Reader::from_path(radio_id_list_path)?;
+        for result in reader.deserialize() {
+            let record: CsvRecord = result?;
+            // convert from CSV record to DmrId struct
+            let dmr_id = parse_dmr_id_record(&record)?;
+            // append to codeplug.config.dmr_configuration.id_list
+            if codeplug.config.is_none() {
+                codeplug.config = Some(Configuration {
+                    dmr_configuration: Some(DmrConfiguration {
+                        id_list: Vec::new(),
+                    }),
+                });
+            }
+            codeplug.config.as_mut().unwrap().dmr_configuration.as_mut().unwrap().id_list.push(dmr_id);
+        }
+    }
 
     Ok(codeplug)
 }
@@ -189,7 +226,7 @@ fn parse_tone(tone: &str) -> Option<Tone> {
 }
 
 // Convert the CSV channel hashmap into a Channel struct
-fn parse_channel_record(csv_channel: &CsvChannel) -> Result<Channel, Box<dyn Error>> {
+fn parse_channel_record(csv_channel: &CsvRecord) -> Result<Channel, Box<dyn Error>> {
     let mut channel = Channel {
         index: 0,
         name: String::new(),
@@ -241,4 +278,36 @@ fn parse_channel_record(csv_channel: &CsvChannel) -> Result<Channel, Box<dyn Err
     }
 
     Ok(channel)
+}
+
+// Convert the CSV zone hashmap into a Zone struct
+fn parse_zone_record(csv_zone: &CsvRecord, codeplug: &Codeplug) -> Result<Zone, Box<dyn Error>> {
+    let mut zone = Zone {
+        name: String::new(),
+        channels: Vec::new(),
+    };
+
+    zone.name = csv_zone.get("Zone Name").unwrap().to_string();
+    // Channels are stored as a list of names, separated by "|"
+    let channel_names: Vec<&str> = csv_zone.get("Zone Channel Member").unwrap().split('|').collect();
+    for name in channel_names {
+        // find the channel by name in the codeplug
+        let channel = codeplug.channels.iter().find(|&c| c.name == name);
+        match channel {
+            Some(c) => zone.channels.push(c.index),
+            None => return Err(format!("Channel not found: {}", name).into()),
+        }
+    }
+
+    Ok(zone)
+}
+
+// Convert the CSV DMR ID hashmap into a DMRId struct
+fn parse_dmr_id_record(csv_dmr_id: &CsvRecord) -> Result<DmrId, Box<dyn Error>> {
+    let dmr_id = DmrId {
+        id: csv_dmr_id.get("Radio ID").unwrap().parse::<u32>()?,
+        name: csv_dmr_id.get("Name").unwrap().to_string(),
+    };
+
+    Ok(dmr_id)
 }

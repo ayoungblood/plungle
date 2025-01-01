@@ -1,16 +1,12 @@
 // src/main.rs
 
 use std::error::Error;
-//use std::path::Path;
 use structopt::StructOpt;
+use helpers::*;
 
 mod helpers;
-// mod frequency;
-// mod power;
 mod radios;
 mod structures;
-
-use helpers::*;
 
 // plungle - Radio codeplug conversion tool
 // Usage: plungle [options] <operation> [<args>]
@@ -48,6 +44,7 @@ fn dump(codeplug: &structures::Codeplug, opt: &Opt) -> Result<structures::Codepl
         channels: Vec::new(),
         zones: Vec::new(),
         lists: Vec::new(),
+        config: None,
     };
     // we are dumping everything
     if opt.dump.is_none() || opt.dump.as_ref().unwrap() == "all" {

@@ -59,7 +59,7 @@ pub struct Channel {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Zone {
     pub name: String,
-    pub channels: Vec<Channel>,
+    pub channels: Vec<u32>,
 }
 
 /// Talkgroup
@@ -76,10 +76,30 @@ pub struct TalkgroupList {
     pub talkgroups: Vec<Talkgroup>,
 }
 
+/// DMR ID
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct DmrId {
+    pub id: u32,
+    pub name: String,
+}
+
+/// DMR Configuration
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct DmrConfiguration {
+    pub id_list: Vec<DmrId>,
+}
+
+/// Configuration
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct Configuration {
+    pub dmr_configuration: Option<DmrConfiguration>,
+}
+
 /// Codeplug
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Codeplug {
     pub channels: Vec<Channel>,
     pub zones: Vec<Zone>,
     pub lists: Vec<TalkgroupList>,
+    pub config: Option<Configuration>,
 }
