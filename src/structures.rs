@@ -28,7 +28,7 @@ pub struct Tone {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct FmChannel {
     pub bandwidth: rust_decimal::Decimal,
-    pub squelch_level: u8, // squelch level as a percentage, 0-100
+    pub squelch_level: u8, // @TODO this needs work
     pub tone_rx: Option<Tone>,
     pub tone_tx: Option<Tone>,
 }
@@ -60,7 +60,7 @@ pub struct Channel {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Zone {
     pub name: String,
-    pub channels: Vec<u32>,
+    pub channels: Vec<String>,
 }
 
 /// DMR TalkgroupCallType

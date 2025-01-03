@@ -7,6 +7,7 @@ use helpers::*;
 mod helpers;
 mod radios;
 mod structures;
+mod validate;
 
 // plungle - Radio codeplug conversion tool
 // Usage: plungle [options] <operation> [<args>]
@@ -95,6 +96,19 @@ fn dump(codeplug: &structures::Codeplug, opt: &Opt) -> Result<structures::Codepl
     return Ok(new_codeplug);
 }
 
+fn load(opt: &Opt) -> Result<structures::Codeplug, Box<dyn Error>> {
+    // validate the input path
+    if opt.input.is_none() {
+        cprintln!(ANSI_C_RED, "Input path is required");
+        return Err("Bad input path".into());
+    }
+    let input_path = opt.input.as_ref().unwrap();
+    dprintln!(opt.verbose, 3, "Input path: {:?}", input_path);
+    // read the file and deserialize the codeplug
+    let codeplug: structures::Codeplug = serde_json::from_str(&std::fs::read_to_string(input_path)?)?;
+    Ok(codeplug)
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
@@ -108,14 +122,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         let codeplug = radios::read_codeplug(&opt)?;
         // dump codeplug
         dump(&codeplug, &opt)?;
+        // validate codeplug
+        radios::validate_codeplug(&codeplug, &opt)?;
     } else if opt.operation == "write" || opt.operation == "w" {
-        // make sure we have a radio model
-        if opt.radio.is_none() {
-            eprintln!("Radio model is required for operation: write");
-            std::process::exit(1);
-        }
-        eprintln!("Writing codeplug...");
-        eprintln!("Output path: {}", opt.output.as_ref().unwrap().display());
+        // load the codeplug
+        let codeplug = load(&opt)?;
+        // write() validates the radio model and output paths
+        radios::write_codeplug(&codeplug, &opt)?;
     } else if opt.operation == "validate" || opt.operation == "v" {
         eprintln!("Validating codeplug...");
     } else if opt.operation == "filter" || opt.operation == "f" {

@@ -13,7 +13,7 @@ use crate::*;
 
 // CSV Export Format:
 // Channel.CSV
-// - No.: Channel Index
+// - No.: channel Index
 // - Channel Name: 16 characters?
 // - Receive Frequency: frequency in MHz
 // - Transmit Frequency: frequency in MHz
@@ -177,58 +177,55 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to DmrTalkgroupList struct
-            let talkgroup_list = DmrTalkgroupList {
+            let mut talkgroup_list = DmrTalkgroupList {
                 name: record.get("Group Name").unwrap().to_string(),
                 talkgroups: Vec::new(),
             };
-            // // Talkgroup names are stored as a list, separated by "|"
-            // let talkgroup_names: Vec<&str> = record.get("Contact").unwrap().split('|').collect();
-            // // Talkgroup IDs are stored as a list, separated by "|"
-            // let talkgroup_ids: Vec<&str> = record.get("Contact TG/DMR ID").unwrap().split('|').collect();
-            // for (name, id) in talkgroup_names.iter().zip(talkgroup_ids.iter()) {
-            //     let talkgroup = codeplug.talkgroups.iter().find(|&t| t.name == *name);
-            //     match talkgroup {
-            //         Some(t) => {
-            //             let talkgroup = DmrTalkgroup {
-            //                 id: t.id,
-            //                 name: t.name.clone(),
-            //                 call_type: t.call_type.clone(),
-            //             };
-            //             talkgroup_list.talkgroups.push(talkgroup);
-            //         },
-            //         None => return Err(format!("Talkgroup not found: {}", name).into()),
-            //     }
-            // }
+            // alkgroup names are stored as a list, separated by "|"
+            let talkgroup_names: Vec<&str> = record.get("Contact").unwrap().split('|').collect();
+            // find the talkgroup by name
+            for name in talkgroup_names {
+                let talkgroup = codeplug.talkgroups.iter().find(|&t| t.name == name);
+                match talkgroup {
+                    Some(t) => talkgroup_list.talkgroups.push(t.clone()),
+                    None => return Err(format!("Talkgroup not found: {}", name).into()),
+                }
+            }
+
             // append to codeplug.talkgroup_lists
             codeplug.talkgroup_lists.push(talkgroup_list);
         }
     }
 
     // Check for Channel.CSV
-    let mut channel_path: PathBuf = input_path.clone();
-    channel_path.push("Channel.CSV");
-    if !channel_path.exists() {
+    let mut channels_path: PathBuf = input_path.clone();
+    channels_path.push("Channel.CSV");
+    if !channels_path.exists() {
         return Err("Channel.CSV not found".into());
     } else {
-        dprintln!(opt.verbose, 3, "Reading {}", channel_path.display());
-        let mut reader = csv::Reader::from_path(channel_path)?;
+        dprintln!(opt.verbose, 3, "Reading {}", channels_path.display());
+        let mut reader = csv::Reader::from_path(channels_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to Channel struct
             let channel = parse_channel_record(&record)?;
+            // Anytone D878UV stores VFO A/B at 4001/4002, skip these
+            if (channel.index == 4001 && channel.name == "Channel VFO A") ||
+               (channel.index == 4002 && channel.name == "Channel VFO B") {
+                continue;
+            }
             // append to codeplug.channels
             codeplug.channels.push(channel);
         }
     }
 
     // Check for Zone.CSV
-    let mut zone_path: PathBuf = input_path.clone();
-    zone_path.push("Zone.CSV");
-    if !zone_path.exists() {
-        return Err("Zone.CSV not found".into());
-    } else {
-        dprintln!(opt.verbose, 3, "Reading {}", zone_path.display());
-        let mut reader = csv::Reader::from_path(zone_path)?;
+    let mut zones_path: PathBuf = input_path.clone();
+    zones_path.push("Zone.CSV");
+    // if Zone.CSV doesn't exist, no problem, we just don't have any zones
+    if zones_path.exists() {
+        dprintln!(opt.verbose, 3, "Reading {}", zones_path.display());
+        let mut reader = csv::Reader::from_path(zones_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to Zone struct
@@ -334,8 +331,14 @@ fn parse_channel_record(csv_channel: &CsvRecord) -> Result<Channel, Box<dyn Erro
         channel.dmr = Some(DmrChannel {
             timeslot: csv_channel.get("Slot").unwrap().parse::<u8>()?,
             color_code: csv_channel.get("Color Code").unwrap().parse::<u8>()?,
-            talkgroup: None, // @TODO
-            talkgroup_list: None, // @TODO
+            // digital channels will always have Contact set (name of a talkgroup/group or private call),
+            // and optionally will have Receive Group List set (name of a talkgroup list) or "None" if no list
+            talkgroup: csv_channel.get("Contact").map(|s| s.to_string()),
+            talkgroup_list: if csv_channel.get("Receive Group List").unwrap() == "None" {
+                None
+            } else {
+                Some(csv_channel.get("Receive Group List").unwrap().to_string())
+            },
         })
     } else {
         return Err("Unparsed channel mode".into());
@@ -358,7 +361,7 @@ fn parse_zone_record(csv_zone: &CsvRecord, codeplug: &Codeplug) -> Result<Zone, 
         // find the channel by name in the codeplug
         let channel = codeplug.channels.iter().find(|&c| c.name == name);
         match channel {
-            Some(c) => zone.channels.push(c.index),
+            Some(c) => zone.channels.push(c.name.clone()),
             None => return Err(format!("Channel not found: {}", name).into()),
         }
     }
