@@ -2,14 +2,13 @@
 // reference https://burntsushi.net/csv/ for CSV parsing technique
 
 use std::error::Error;
-use std::collections::HashMap;
-use crate::structures::*;
-use crate::*;
-use rust_decimal::prelude::*;
-use std::path::PathBuf;
-
-// use std::io;
 use std::fs;
+use std::path::PathBuf;
+use std::collections::HashMap;
+use rust_decimal::prelude::*;
+
+use crate::*;
+use crate::structures::*;
 
 // CSV Export Format
 // OpenGD77 CPS Version R2024.09.13.02

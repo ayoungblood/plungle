@@ -61,7 +61,9 @@ pub fn write_codeplug(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Erro
     }
 
     // search for the radio model in the supported radios
-    if "opengd77_rt3s".contains(radio_model) {
+    if "anytone_x78".contains(radio_model) {
+        return anytone_x78::write(codeplug, opt);
+    } else if "opengd77_rt3s".contains(radio_model) {
         return opengd77_rt3s::write(codeplug, opt);
     // } else if "chirp_generic".contains(radio_model) {
     //     return chirp_generic::write(codeplug, opt);

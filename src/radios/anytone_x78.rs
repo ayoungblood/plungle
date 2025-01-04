@@ -2,16 +2,44 @@
 // reference https://burntsushi.net/csv/ for CSV parsing technique
 
 use std::error::Error;
-use std::collections::HashMap;
-use crate::Opt;
-use rust_decimal::prelude::*;
+use std::fs;
 use std::path::PathBuf;
-
-use crate::structures::{ChannelMode, ToneMode, Tone, FmChannel, DmrChannel, Channel, Zone, DmrId, DmrTalkgroupCallType, DmrTalkgroup, DmrTalkgroupList, DmrConfiguration, Configuration, Codeplug};
+use std::collections::HashMap;
+use rust_decimal::prelude::*;
 
 use crate::*;
+use crate::structures::*;
 
-// CSV Export Format:
+// CSV Export Format
+// Anytone D878UV CPS Version 3.04
+/* Files
+ * 2ToneEncode.CSV
+ * 5ToneEncode.CSV
+ * AESEncryptionCode.CSV
+ * AlertTone.CSV
+ * AnalogAddressBook.CSV
+ * APRS.CSV
+ * ARC4EncryptionCode.CSV
+ * AutoRepeaterOffsetFrequencys.CSV
+ * Channel.CSV
+ * DigitalContactList.CSV
+ * DTMFEncode.CSV
+ * FM.CSV
+ * GPSRoaming.CSV
+ * HotKey_HotKey.CSV
+ * HotKey_QuickCall.CSV
+ * HotKey_State.CSV
+ * OptionalSetting.CSV
+ * PrefabricatedSMS.CSV
+ * RadioIDList.CSV
+ * ReceiveGroupCallList.CSV
+ * RoamingChannel.CSV
+ * RoamingZone.CSV
+ * ScanList.CSV
+ * TalkGroups.CSV
+ * Zone.CSV
+ */
+
 // Channel.CSV
 // - No.: channel Index
 // - Channel Name: 16 characters?
@@ -68,17 +96,18 @@ use crate::*;
 // - AnaAprsTxPath: 0
 // - ARC4: 0
 // - ex_emg_kind: 0
-// TalkGroups.CSV
-// - No.: DMR talkgroup index
-// - Radio ID: DMR talkgroup ID
-// - Name: DMR talkgroup name (@TODO length??)
-// - Call Type: [Group Call, ???]
-// - Call Alert: [None, ???]
+
+// RadioIDList.CSV
+// - No.: radio ID index
+// - Radio ID: radio ID
+// - Name: radio ID name
+
 // ReceiveGroupCallList.CSV
 // - No.: talkgroup list index
 // - Group Name: DMR talkgroup list name
 // - Contact: list of DMR talkgroup names, "|" separated
 // - Contact TG/DMR ID: list of DMR talkgroup IDs, "|" separated
+
 // ScanList.CSV
 // - No.: scan list index
 // - Scan List Name: scan list name
@@ -98,6 +127,14 @@ use crate::*;
 // - Look Back Time B[s]: default 3
 // - Dropout Delay Time[s]: default 3.1
 // - Priority Sample Time[s]: default 3.1
+
+// TalkGroups.CSV
+// - No.: DMR talkgroup index
+// - Radio ID: DMR talkgroup ID
+// - Name: DMR talkgroup name (@TODO length??)
+// - Call Type: [Group Call, ???]
+// - Call Alert: [None, ???]
+
 // Zone.CSV
 // - No.: zone index
 // - Zone Name: zone name
@@ -111,12 +148,163 @@ use crate::*;
 // - B Channel RX Frequency: RX frequency in MHz of selected channel in zone
 // - B Channel TX Frequency: TX frequency in MHz of selected channel in zone
 // - Zone Hide: [0, ???]
-// RadioIDList.CSV
-// - No.: radio ID index
-// - Radio ID: radio ID
-// - Name: radio ID name
 
 type CsvRecord = HashMap<String, String>;
+
+// READ ///////////////////////////////////////////////////////////////////////
+
+fn parse_talkgroup_record(record: &CsvRecord) -> Result<DmrTalkgroup, Box<dyn Error>> {
+    let talkgroup = DmrTalkgroup {
+        id: record.get("Radio ID").unwrap().parse::<u32>()?,
+        name: record.get("Name").unwrap().to_string(),
+        call_type: match record.get("Call Type").unwrap().as_str() {
+            "Group Call" => DmrTalkgroupCallType::Group,
+            "Private Call" => DmrTalkgroupCallType::Private,
+            "All Call" => DmrTalkgroupCallType::AllCall,
+            _ => return Err(format!("Unrecognized call type: {}", record.get("Call Type").unwrap()).into()),
+        },
+    };
+
+    Ok(talkgroup)
+}
+
+fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug) -> Result<DmrTalkgroupList, Box<dyn Error>> {
+    let mut talkgroup_list = DmrTalkgroupList {
+        name: record.get("Group Name").unwrap().to_string(),
+        talkgroups: Vec::new(),
+    };
+
+    // Talkgroup names are stored as a list, separated by "|"
+    let talkgroup_names: Vec<&str> = record.get("Contact").unwrap().split('|').collect();
+    // Find the talkgroup by name
+    for name in talkgroup_names {
+        let talkgroup = codeplug.talkgroups.iter().find(|&t| t.name == name);
+        match talkgroup {
+            Some(t) => talkgroup_list.talkgroups.push(t.clone()),
+            None => return Err(format!("Talkgroup not found: {}", name).into()),
+        }
+    }
+
+    Ok(talkgroup_list)
+}
+
+// Convert a CTCSS/DCS string into a Tone struct
+// Anytone stores CTCSS/DCS as follows:
+// - "Off" for no tone
+// - "100" or "141.3" for CTCSS frequency (decimal point may or may not be present)
+// - "D023N" or "D023I" for DCS code (N for normal, I for inverted)
+fn parse_tone(tone: &str) -> Option<Tone> {
+    if tone == "Off" {
+        return None;
+    }
+    // if string begins with D, it's DCS
+    if tone.starts_with("D") {
+        return Some(Tone {
+            mode: ToneMode::DCS,
+            ctcss: None,
+            dcs: Some(tone.to_string()),
+        });
+    }
+    Some(Tone {
+        mode: ToneMode::CTCSS,
+        ctcss: Some(Decimal::from_str(tone).unwrap()),
+        dcs: None,
+    })
+}
+
+// Convert the CSV channel hashmap into a Channel struct
+fn parse_channel_record(record: &CsvRecord) -> Result<Channel, Box<dyn Error>> {
+    let mut channel = Channel {
+        index: 0,
+        name: String::new(),
+        mode: ChannelMode::AM, // Default mode
+        frequency_rx: Decimal::new(0,0),
+        frequency_tx: Decimal::new(0,0),
+        rx_only: false,
+        power: Decimal::new(0,0),
+        fm: None,
+        dmr: None,
+    };
+
+    channel.index = record.get("No.").unwrap().parse::<u32>()?;
+    channel.name = record.get("Channel Name").unwrap().to_string();
+    channel.mode = match record.get("Channel Type").unwrap().as_str() {
+        "A-Analog" => ChannelMode::FM,
+        "D-Digital" => ChannelMode::DMR,
+        _ => return Err(format!("Unrecognized channel type: {}", record.get("Channel Type").unwrap()).into()),
+    };
+    channel.frequency_rx = Decimal::from_str(record.get("Receive Frequency").unwrap())? * Decimal::new(1_000_000, 0);
+    channel.frequency_tx = Decimal::from_str(record.get("Transmit Frequency").unwrap())? * Decimal::new(1_000_000, 0);
+    channel.rx_only = record.get("PTT Prohibit").unwrap() == "On";
+    channel.power = match record.get("Transmit Power").unwrap().as_str() {
+        "Turbo" => Decimal::from_str("7.0").unwrap(),
+        "High" => Decimal::from_str("5.0").unwrap(),
+        "Mid" => Decimal::from_str("2.5").unwrap(),
+        "Low" => Decimal::from_str("1.0").unwrap(),
+        _ => return Err(format!("Unrecognized power level: {}", record.get("Transmit Power").unwrap()).into()),
+    };
+    if channel.mode == ChannelMode::FM { // FM specific fields
+        channel.fm = Some(FmChannel {
+            bandwidth: match record.get("Band Width").unwrap().as_str() {
+                "12.5K" => Decimal::from_str("12.5").unwrap() * Decimal::new(1_000, 0),
+                "25K" => Decimal::from_str("25.0").unwrap() * Decimal::new(1_000, 0),
+                _ => return Err(format!("Unrecognized bandwidth: {}", record.get("Band Width").unwrap()).into()),
+            },
+            squelch_level: 0, // @TODO
+            tone_rx: parse_tone(record.get("CTCSS/DCS Decode").unwrap().as_str()),
+            tone_tx: parse_tone(record.get("CTCSS/DCS Encode").unwrap().as_str()),
+        });
+    } else if channel.mode == ChannelMode::DMR { // DMR specific fields
+        channel.dmr = Some(DmrChannel {
+            timeslot: record.get("Slot").unwrap().parse::<u8>()?,
+            color_code: record.get("Color Code").unwrap().parse::<u8>()?,
+            // digital channels will always have Contact set (name of a talkgroup/group or private call),
+            // and optionally will have Receive Group List set (name of a talkgroup list) or "None" if no list
+            talkgroup: record.get("Contact").map(|s| s.to_string()),
+            talkgroup_list: if record.get("Receive Group List").unwrap() == "None" {
+                None
+            } else {
+                Some(record.get("Receive Group List").unwrap().to_string())
+            },
+        })
+    } else {
+        return Err("Unparsed channel mode".into());
+    }
+
+    Ok(channel)
+}
+
+// Convert the CSV zone hashmap into a Zone struct
+fn parse_zone_record(csv_zone: &CsvRecord, codeplug: &Codeplug) -> Result<Zone, Box<dyn Error>> {
+    let mut zone = Zone {
+        name: String::new(),
+        channels: Vec::new(),
+    };
+
+    zone.name = csv_zone.get("Zone Name").unwrap().to_string();
+    // Channels are stored as a list of names, separated by "|"
+    let channel_names: Vec<&str> = csv_zone.get("Zone Channel Member").unwrap().split('|').collect();
+    for name in channel_names {
+        // find the channel by name in the codeplug
+        let channel = codeplug.channels.iter().find(|&c| c.name == name);
+        match channel {
+            Some(c) => zone.channels.push(c.name.clone()),
+            None => return Err(format!("Channel not found: {}", name).into()),
+        }
+    }
+
+    Ok(zone)
+}
+
+// Convert the CSV DMR ID hashmap into a DMRId struct
+fn parse_dmr_id_record(csv_dmr_id: &CsvRecord) -> Result<DmrId, Box<dyn Error>> {
+    let dmr_id = DmrId {
+        id: csv_dmr_id.get("Radio ID").unwrap().parse::<u32>()?,
+        name: csv_dmr_id.get("Name").unwrap().to_string(),
+    };
+
+    Ok(dmr_id)
+}
 
 pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
@@ -152,16 +340,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to DmrTalkgroup struct
-            let talkgroup = DmrTalkgroup {
-                id: record.get("Radio ID").unwrap().parse::<u32>()?,
-                name: record.get("Name").unwrap().to_string(),
-                call_type: match record.get("Call Type").unwrap().as_str() {
-                    "Group Call" => DmrTalkgroupCallType::Group,
-                    "Private Call" => DmrTalkgroupCallType::Private,
-                    "All Call" => DmrTalkgroupCallType::AllCall,
-                    _ => return Err(format!("Unrecognized call type: {}", record.get("Call Type").unwrap()).into()),
-                },
-            };
+            let talkgroup = parse_talkgroup_record(&record)?;
             // append to codeplug.talkgroups
             codeplug.talkgroups.push(talkgroup);
         }
@@ -177,21 +356,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to DmrTalkgroupList struct
-            let mut talkgroup_list = DmrTalkgroupList {
-                name: record.get("Group Name").unwrap().to_string(),
-                talkgroups: Vec::new(),
-            };
-            // alkgroup names are stored as a list, separated by "|"
-            let talkgroup_names: Vec<&str> = record.get("Contact").unwrap().split('|').collect();
-            // find the talkgroup by name
-            for name in talkgroup_names {
-                let talkgroup = codeplug.talkgroups.iter().find(|&t| t.name == name);
-                match talkgroup {
-                    Some(t) => talkgroup_list.talkgroups.push(t.clone()),
-                    None => return Err(format!("Talkgroup not found: {}", name).into()),
-                }
-            }
-
+            let talkgroup_list = parse_talkgroup_list_record(&record, &codeplug)?;
             // append to codeplug.talkgroup_lists
             codeplug.talkgroup_lists.push(talkgroup_list);
         }
@@ -261,120 +426,163 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     Ok(codeplug)
 }
 
-// Convert a CTCSS/DCS string into a Tone struct
-// Anytone stores CTCSS/DCS as follows:
-// - "Off" for no tone
-// - "100" or "141.3" for CTCSS frequency (decimal point may or may not be present)
-// - "D023N" or "D023I" for DCS code (N for normal, I for inverted)
-fn parse_tone(tone: &str) -> Option<Tone> {
-    if tone == "Off" {
-        return None;
-    }
-    // if string begins with D, it's DCS
-    if tone.starts_with("D") {
-        return Some(Tone {
-            mode: ToneMode::DCS,
-            ctcss: None,
-            dcs: Some(tone.to_string()),
-        });
-    }
-    Some(Tone {
-        mode: ToneMode::CTCSS,
-        ctcss: Some(Decimal::from_str(tone).unwrap()),
-        dcs: None,
-    })
-}
+// WRITE //////////////////////////////////////////////////////////////////////
 
-// Convert the CSV channel hashmap into a Channel struct
-fn parse_channel_record(csv_channel: &CsvRecord) -> Result<Channel, Box<dyn Error>> {
-    let mut channel = Channel {
-        index: 0,
-        name: String::new(),
-        mode: ChannelMode::AM, // Default mode
-        frequency_rx: Decimal::new(0,0),
-        frequency_tx: Decimal::new(0,0),
-        rx_only: false,
-        power: Decimal::new(0,0),
-        fm: None,
-        dmr: None,
-    };
+pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
 
-    channel.index = csv_channel.get("No.").unwrap().parse::<u32>()?;
-    channel.name = csv_channel.get("Channel Name").unwrap().to_string();
-    channel.mode = match csv_channel.get("Channel Type").unwrap().as_str() {
-        "A-Analog" => ChannelMode::FM,
-        "D-Digital" => ChannelMode::DMR,
-        _ => return Err(format!("Unrecognized channel type: {}", csv_channel.get("Channel Type").unwrap()).into()),
-    };
-    channel.frequency_rx = Decimal::from_str(csv_channel.get("Receive Frequency").unwrap())? * Decimal::new(1_000_000, 0);
-    channel.frequency_tx = Decimal::from_str(csv_channel.get("Transmit Frequency").unwrap())? * Decimal::new(1_000_000, 0);
-    channel.rx_only = csv_channel.get("PTT Prohibit").unwrap() == "On";
-    channel.power = match csv_channel.get("Transmit Power").unwrap().as_str() {
-        "Turbo" => Decimal::from_str("7.0").unwrap(),
-        "High" => Decimal::from_str("5.0").unwrap(),
-        "Mid" => Decimal::from_str("2.5").unwrap(),
-        "Low" => Decimal::from_str("1.0").unwrap(),
-        _ => return Err(format!("Unrecognized power level: {}", csv_channel.get("Transmit Power").unwrap()).into()),
-    };
-    if channel.mode == ChannelMode::FM { // FM specific fields
-        channel.fm = Some(FmChannel {
-            bandwidth: match csv_channel.get("Band Width").unwrap().as_str() {
-                "12.5K" => Decimal::from_str("12.5").unwrap() * Decimal::new(1_000, 0),
-                "25K" => Decimal::from_str("25.0").unwrap() * Decimal::new(1_000, 0),
-                _ => return Err(format!("Unrecognized bandwidth: {}", csv_channel.get("Band Width").unwrap()).into()),
-            },
-            squelch_level: 0, // @TODO
-            tone_rx: parse_tone(csv_channel.get("CTCSS/DCS Decode").unwrap().as_str()),
-            tone_tx: parse_tone(csv_channel.get("CTCSS/DCS Encode").unwrap().as_str()),
-        });
-    } else if channel.mode == ChannelMode::DMR { // DMR specific fields
-        channel.dmr = Some(DmrChannel {
-            timeslot: csv_channel.get("Slot").unwrap().parse::<u8>()?,
-            color_code: csv_channel.get("Color Code").unwrap().parse::<u8>()?,
-            // digital channels will always have Contact set (name of a talkgroup/group or private call),
-            // and optionally will have Receive Group List set (name of a talkgroup list) or "None" if no list
-            talkgroup: csv_channel.get("Contact").map(|s| s.to_string()),
-            talkgroup_list: if csv_channel.get("Receive Group List").unwrap() == "None" {
-                None
-            } else {
-                Some(csv_channel.get("Receive Group List").unwrap().to_string())
-            },
-        })
-    } else {
-        return Err("Unparsed channel mode".into());
-    }
-
-    Ok(channel)
-}
-
-// Convert the CSV zone hashmap into a Zone struct
-fn parse_zone_record(csv_zone: &CsvRecord, codeplug: &Codeplug) -> Result<Zone, Box<dyn Error>> {
-    let mut zone = Zone {
-        name: String::new(),
-        channels: Vec::new(),
-    };
-
-    zone.name = csv_zone.get("Zone Name").unwrap().to_string();
-    // Channels are stored as a list of names, separated by "|"
-    let channel_names: Vec<&str> = csv_zone.get("Zone Channel Member").unwrap().split('|').collect();
-    for name in channel_names {
-        // find the channel by name in the codeplug
-        let channel = codeplug.channels.iter().find(|&c| c.name == name);
-        match channel {
-            Some(c) => zone.channels.push(c.name.clone()),
-            None => return Err(format!("Channel not found: {}", name).into()),
+    // if the output path exists, check if it is an empty directory
+    // if it does not exist, create it
+    if let Some(output_path) = &opt.output {
+        if output_path.exists() {
+            if output_path.is_dir() {
+                // check if the directory is empty
+                let dir_entries = std::fs::read_dir(output_path)?;
+                if dir_entries.count() > 0 {
+                    cprintln!(ANSI_C_RED, "Output path exists and is not empty, not overwriting!");
+                    return Err("Bad output path".into());
+                }
+            }
+        } else {
+            // if it does not exist, create it
+            std::fs::create_dir_all(output_path)?;
+        }
+        if fs::metadata(output_path)?.permissions().readonly() {
+            cprintln!(ANSI_C_RED, "Output path is read-only, cannot write!");
+            return Err("Bad output path".into());
         }
     }
 
-    Ok(zone)
-}
+    // write to Channel.CSV
+    let mut channels_path: PathBuf = opt.output.clone().unwrap();
+    channels_path.push("Channel.CSV");
+    dprintln!(opt.verbose, 3, "Writing {}", channels_path.display());
+    let mut writer = csv::Writer::from_path(channels_path)?;
 
-// Convert the CSV DMR ID hashmap into a DMRId struct
-fn parse_dmr_id_record(csv_dmr_id: &CsvRecord) -> Result<DmrId, Box<dyn Error>> {
-    let dmr_id = DmrId {
-        id: csv_dmr_id.get("Radio ID").unwrap().parse::<u32>()?,
-        name: csv_dmr_id.get("Name").unwrap().to_string(),
-    };
+    // write the header
+    writer.write_record(&[
+        "No.",
+        "Channel Name",
+        "Receive Frequency",
+        "Transmit Frequency",
+        "Channel Type",
+        "Transmit Power",
+        "Band Width",
+        "CTCSS/DCS Decode",
+        "CTCSS/DCS Encode",
+        "Contact",
+        "Contact Call Type",
+        "Contact TG/DMR ID",
+        "Radio ID",
+        "Busy Lock/TX Permit",
+        "Squelch Mode",
+        "Optional Signal",
+        "DTMF ID",
+        "2Tone ID",
+        "5Tone ID",
+        "PTT ID",
+        "Color Code",
+        "Slot",
+        "Scan List",
+        "Receive Group List",
+        "PTT Prohibit",
+        "Reverse",
+        "Simplex TDMA",
+        "Slot Suit",
+        "AES Digital Encryption",
+        "Digital Encryption Type",
+        "Call Confirmation",
+        "Talk Around(Simplex)",
+        "Work Alone",
+        "Custom CTCSS",
+        "2TONE Decode",
+        "Ranging",
+        "Through Mode",
+        "APRS RX",
+        "Analog APRS PTT Mode",
+        "Digital APRS PTT Mode",
+        "APRS Report Type",
+        "Digital APRS Report Channel",
+        "Correct Frequency[Hz]",
+        "SMS Confirmation",
+        "Exclude channel from roaming",
+        "DMR MODE",
+        "DataACK Disable",
+        "R5toneBot",
+        "R5ToneEot",
+        "Auto Scan",
+        "Ana Aprs Mute",
+        "Send Talker Alias",
+        "AnaAprsTxPath",
+        "ARC4",
+        "ex_emg_kind"
+    ])?;
 
-    Ok(dmr_id)
+    for channel in &codeplug.channels {
+        writer.write_record(&[
+            channel.index.to_string(), // No.
+            channel.name.clone(), // Channel Name
+            format!("{:0.6}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
+            format!("{:0.6}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
+            match channel.mode {
+                ChannelMode::FM => "A-Analog".to_string(),
+                ChannelMode::DMR => "D-Digital".to_string(),
+                _ => return Err(format!("Unsupported channel mode: index = {}, mode = {:?}", channel.index,channel.mode).into()),
+            }, // Channel Type
+            "High".to_string(), // Transmit Power @TODO
+            "".to_string(), // Band Width
+            "".to_string(), // CTCSS/DCS Decode
+            "".to_string(), // CTCSS/DCS Encode
+            "".to_string(), // Contact
+            "".to_string(), // Contact Call Type
+            "".to_string(), // Contact TG/DMR ID
+            "".to_string(), // Radio ID
+            "".to_string(), // Busy Lock/TX Permit
+            "".to_string(), // Squelch Mode
+            "".to_string(), // Optional Signal
+            "1".to_string(), // DTMF ID
+            "1".to_string(), // 2Tone ID
+            "1".to_string(), // 5Tone ID
+            "Off".to_string(), // PTT ID
+            "".to_string(), // Color Code
+            "".to_string(), // Slot
+            "".to_string(), // Scan List
+            "".to_string(), // Receive Group List
+            "".to_string(), // PTT Prohibit
+            "Off".to_string(), // Reverse
+            "Off".to_string(), // Simplex TDMA
+            "Off".to_string(), // Slot Suit
+            "Normal Encryption".to_string(), // AES Digital Encryption
+            "Off".to_string(), // Digital Encryption Type
+            "Off".to_string(), // Call Confirmation
+            "Off".to_string(), // Talk Around(Simplex)
+            "Off".to_string(), // Work Alone
+            "251.1".to_string(), // Custom CTCSS
+            "0".to_string(), // 2TONE Decode
+            "Off".to_string(), // Ranging
+            "Off".to_string(), // Through Mode
+            "Off".to_string(), // APRS RX
+            "Off".to_string(), // Analog APRS PTT Mode
+            "Off".to_string(), // Digital APRS PTT Mode
+            "Off".to_string(), // APRS Report Type
+            "1".to_string(), // Digital APRS Report Channel
+            "0".to_string(), // Correct Frequency[Hz]
+            "Off".to_string(), // SMS Confirmation
+            "0".to_string(), // Exclude channel from roaming
+            "0".to_string(), // DMR MODE
+            "0".to_string(), // DataACK Disable
+            "0".to_string(), // R5toneBot
+            "0".to_string(), // R5ToneEot
+            "0".to_string(), // Auto Scan
+            "0".to_string(), // Ana Aprs Mute
+            "0".to_string(), // Send Talker Alias
+            "0".to_string(), // AnaAprsTxPath
+            "0".to_string(), // ARC4
+            "0".to_string(), // ex_emg_kind
+        ])?;
+    }
+
+    writer.flush()?;
+
+    Ok(())
 }
