@@ -6,9 +6,22 @@ use std::fs;
 use std::path::PathBuf;
 use std::collections::HashMap;
 use rust_decimal::prelude::*;
+use std::sync::OnceLock;
 
 use crate::*;
 use crate::structures::*;
+
+static PROPS: OnceLock<structures::RadioProperties> = OnceLock::new();
+fn get_props() -> &'static structures::RadioProperties {
+    PROPS.get_or_init(|| {
+        let mut props = structures::RadioProperties::default();
+        props.channels_max = 1024;
+        props.channel_name_width_max = 16;
+        // dynamically set
+        props.channel_index_width = (props.channels_max as f64).log10().ceil() as usize;
+        props
+    })
+}
 
 // CSV Export Format
 // OpenGD77 CPS Version R2024.09.13.02
@@ -220,6 +233,7 @@ pub fn parse_zone_record(record: &CsvRecord, codeplug: &Codeplug) -> Result<Zone
 
 pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 4, "{:?}", get_props());
 
     let mut codeplug = Codeplug {
         channels: Vec::new(),
@@ -313,6 +327,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
 
 pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 4, "{:?}", get_props());
 
     // if the output path exists, check if it is an empty directory
     // if it does not exist, create it
@@ -375,6 +390,7 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
     ])?;
 
     for channel in &codeplug.channels {
+        dprintln!(opt.verbose, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width = get_props().channel_index_width);
         if channel.mode == ChannelMode::FM {
             writer.write_record(&[
                 channel.index.to_string(), // Channel Number

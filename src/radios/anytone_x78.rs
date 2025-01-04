@@ -6,9 +6,22 @@ use std::fs;
 use std::path::PathBuf;
 use std::collections::HashMap;
 use rust_decimal::prelude::*;
+use std::sync::OnceLock;
 
 use crate::*;
 use crate::structures::*;
+
+static PROPS: OnceLock<structures::RadioProperties> = OnceLock::new();
+fn get_props() -> &'static structures::RadioProperties {
+    PROPS.get_or_init(|| {
+        let mut props = structures::RadioProperties::default();
+        props.channels_max = 4000;
+        props.channel_name_width_max = 16;
+        // dynamically set
+        props.channel_index_width = (props.channels_max as f64).log10().ceil() as usize;
+        props
+    })
+}
 
 // CSV Export Format
 // Anytone D878UV CPS Version 3.04
@@ -132,7 +145,7 @@ use crate::structures::*;
 // - No.: DMR talkgroup index
 // - Radio ID: DMR talkgroup ID
 // - Name: DMR talkgroup name (@TODO length??)
-// - Call Type: [Group Call, ???]
+// - Call Type: [Group Call, All Call, Private Call]
 // - Call Alert: [None, ???]
 
 // Zone.CSV
@@ -308,6 +321,7 @@ fn parse_dmr_id_record(csv_dmr_id: &CsvRecord) -> Result<DmrId, Box<dyn Error>> 
 
 pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 4, "{:?}", get_props());
 
     let mut codeplug = Codeplug {
         channels: Vec::new(),
@@ -428,8 +442,61 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
 
 // WRITE //////////////////////////////////////////////////////////////////////
 
+pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 3, "Writing {}", path.display());
+
+    let mut writer = csv::WriterBuilder::new()
+        .quote_style(csv::QuoteStyle::Always) // Anytone CPS expects all fields to be quoted
+        .terminator(csv::Terminator::CRLF)
+        .from_path(path)?;
+
+    // write the header
+    writer.write_record(&[
+        "No.",
+        "Radio ID",
+        "Name",
+        "Call Type",
+        "Call Alert",
+    ])?;
+
+    for (ii, talkgroup) in codeplug.talkgroups.iter().enumerate() {
+        dprintln!(opt.verbose, 4, "Writing talkgroup {:width$}: {}", talkgroup.id, talkgroup.name, width = get_props().channel_index_width);
+        writer.write_record(&[
+            format!("{}", ii + 1), // No.
+            talkgroup.id.to_string(), // Radio ID
+            talkgroup.name.clone(), // Name
+            match talkgroup.call_type {
+                DmrTalkgroupCallType::Group => "Group Call".to_string(),
+                DmrTalkgroupCallType::Private => "Private Call".to_string(),
+                DmrTalkgroupCallType::AllCall => "All Call".to_string(),
+            }, // Call Type
+            "None".to_string(), // Call Alert
+        ])?;
+    }
+
+    writer.flush()?;
+
+    Ok(())
+}
+
+pub fn write_power(channel: &Channel) -> String {
+    if channel.power >= Decimal::from_str("7.0").unwrap() {
+        return "Turbo".to_string();
+    } else if channel.power >= Decimal::from_str("5.0").unwrap() {
+        return "High".to_string();
+    } else if channel.power >= Decimal::from_str("2.5").unwrap() {
+        return "Mid".to_string();
+    } else if channel.power >= Decimal::from_str("1.0").unwrap() {
+        return "Low".to_string();
+    } else {
+        return "Low".to_string();
+    }
+}
+
 pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 4, "{:?}", get_props());
 
     // if the output path exists, check if it is an empty directory
     // if it does not exist, create it
@@ -453,11 +520,18 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
         }
     }
 
+    // write to TalkGroups.CSV
+    let mut talkgroups_path: PathBuf = opt.output.clone().unwrap();
+    talkgroups_path.push(if opt.excel { "TalkGroups2.CSV" } else { "TalkGroups.CSV" });
+    write_talkgroups(codeplug, &talkgroups_path, opt)?;
+
     // write to Channel.CSV
     let mut channels_path: PathBuf = opt.output.clone().unwrap();
-    channels_path.push("Channel.CSV");
+    channels_path.push(if opt.excel { "Channel2.CSV" } else { "Channel.CSV" });
     dprintln!(opt.verbose, 3, "Writing {}", channels_path.display());
-    let mut writer = csv::Writer::from_path(channels_path)?;
+    let mut writer = csv::WriterBuilder::new()
+        .quote_style(csv::QuoteStyle::Always)
+        .from_path(channels_path)?;
 
     // write the header
     writer.write_record(&[
@@ -519,67 +593,144 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
     ])?;
 
     for channel in &codeplug.channels {
-        writer.write_record(&[
-            channel.index.to_string(), // No.
-            channel.name.clone(), // Channel Name
-            format!("{:0.6}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
-            format!("{:0.6}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
-            match channel.mode {
-                ChannelMode::FM => "A-Analog".to_string(),
-                ChannelMode::DMR => "D-Digital".to_string(),
-                _ => return Err(format!("Unsupported channel mode: index = {}, mode = {:?}", channel.index,channel.mode).into()),
-            }, // Channel Type
-            "High".to_string(), // Transmit Power @TODO
-            "".to_string(), // Band Width
-            "".to_string(), // CTCSS/DCS Decode
-            "".to_string(), // CTCSS/DCS Encode
-            "".to_string(), // Contact
-            "".to_string(), // Contact Call Type
-            "".to_string(), // Contact TG/DMR ID
-            "".to_string(), // Radio ID
-            "".to_string(), // Busy Lock/TX Permit
-            "".to_string(), // Squelch Mode
-            "".to_string(), // Optional Signal
-            "1".to_string(), // DTMF ID
-            "1".to_string(), // 2Tone ID
-            "1".to_string(), // 5Tone ID
-            "Off".to_string(), // PTT ID
-            "".to_string(), // Color Code
-            "".to_string(), // Slot
-            "".to_string(), // Scan List
-            "".to_string(), // Receive Group List
-            "".to_string(), // PTT Prohibit
-            "Off".to_string(), // Reverse
-            "Off".to_string(), // Simplex TDMA
-            "Off".to_string(), // Slot Suit
-            "Normal Encryption".to_string(), // AES Digital Encryption
-            "Off".to_string(), // Digital Encryption Type
-            "Off".to_string(), // Call Confirmation
-            "Off".to_string(), // Talk Around(Simplex)
-            "Off".to_string(), // Work Alone
-            "251.1".to_string(), // Custom CTCSS
-            "0".to_string(), // 2TONE Decode
-            "Off".to_string(), // Ranging
-            "Off".to_string(), // Through Mode
-            "Off".to_string(), // APRS RX
-            "Off".to_string(), // Analog APRS PTT Mode
-            "Off".to_string(), // Digital APRS PTT Mode
-            "Off".to_string(), // APRS Report Type
-            "1".to_string(), // Digital APRS Report Channel
-            "0".to_string(), // Correct Frequency[Hz]
-            "Off".to_string(), // SMS Confirmation
-            "0".to_string(), // Exclude channel from roaming
-            "0".to_string(), // DMR MODE
-            "0".to_string(), // DataACK Disable
-            "0".to_string(), // R5toneBot
-            "0".to_string(), // R5ToneEot
-            "0".to_string(), // Auto Scan
-            "0".to_string(), // Ana Aprs Mute
-            "0".to_string(), // Send Talker Alias
-            "0".to_string(), // AnaAprsTxPath
-            "0".to_string(), // ARC4
-            "0".to_string(), // ex_emg_kind
-        ])?;
+        dprintln!(opt.verbose, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width = get_props().channel_index_width);
+        if channel.mode == ChannelMode::FM {
+            writer.write_record(&[
+                channel.index.to_string(), // No.
+                channel.name.clone(), // Channel Name
+                format!("{:0.6}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
+                format!("{:0.6}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
+                "A-Analog".to_string(), // Channel Type
+                write_power(channel), // Transmit Power
+                format!("{}K", (channel.fm.as_ref().unwrap().bandwidth / Decimal::new(1_000, 0)).to_f64().unwrap()), // Band Width
+                if let Some(tone) = &channel.fm.as_ref().unwrap().tone_rx {
+                    match tone.mode {
+                        ToneMode::CTCSS => format!("{:0.1}", tone.ctcss.as_ref().unwrap()),
+                        ToneMode::DCS => tone.dcs.as_ref().unwrap().to_string(),
+                    }
+                } else {
+                    "Off".to_string()
+                }, // CTCSS/DCS Decode
+                if let Some(tone) = &channel.fm.as_ref().unwrap().tone_tx {
+                    match tone.mode {
+                        ToneMode::CTCSS => format!("{:0.1}", tone.ctcss.as_ref().unwrap()),
+                        ToneMode::DCS => tone.dcs.as_ref().unwrap().to_string(),
+                    }
+                } else {
+                    "Off".to_string()
+                }, // CTCSS/DCS Encode
+                "".to_string(), // Contact
+                "".to_string(), // Contact Call Type
+                "".to_string(), // Contact TG/DMR ID
+                "".to_string(), // Radio ID
+                "".to_string(), // Busy Lock/TX Permit
+                if channel.fm.as_ref().unwrap().tone_rx.is_some() {
+                    "CTCSS/DCS".to_string()
+                } else {
+                    "Carrier".to_string()
+                }, // Squelch Mode
+                "".to_string(), // Optional Signal
+                "1".to_string(), // DTMF ID
+                "1".to_string(), // 2Tone ID
+                "1".to_string(), // 5Tone ID
+                "Off".to_string(), // PTT ID
+                "".to_string(), // Color Code
+                "".to_string(), // Slot
+                "".to_string(), // Scan List
+                "".to_string(), // Receive Group List
+                if channel.rx_only { "On" } else { "Off" }.to_string(), // PTT Prohibit
+                "Off".to_string(), // Reverse
+                "Off".to_string(), // Simplex TDMA
+                "Off".to_string(), // Slot Suit
+                "Normal Encryption".to_string(), // AES Digital Encryption
+                "Off".to_string(), // Digital Encryption Type
+                "Off".to_string(), // Call Confirmation
+                "Off".to_string(), // Talk Around(Simplex)
+                "Off".to_string(), // Work Alone
+                "251.1".to_string(), // Custom CTCSS
+                "0".to_string(), // 2TONE Decode
+                "Off".to_string(), // Ranging
+                "Off".to_string(), // Through Mode
+                "Off".to_string(), // APRS RX
+                "Off".to_string(), // Analog APRS PTT Mode
+                "Off".to_string(), // Digital APRS PTT Mode
+                "Off".to_string(), // APRS Report Type
+                "1".to_string(), // Digital APRS Report Channel
+                "0".to_string(), // Correct Frequency[Hz]
+                "Off".to_string(), // SMS Confirmation
+                "0".to_string(), // Exclude channel from roaming
+                "0".to_string(), // DMR MODE
+                "0".to_string(), // DataACK Disable
+                "0".to_string(), // R5toneBot
+                "0".to_string(), // R5ToneEot
+                "0".to_string(), // Auto Scan
+                "0".to_string(), // Ana Aprs Mute
+                "0".to_string(), // Send Talker Alias
+                "0".to_string(), // AnaAprsTxPath
+                "0".to_string(), // ARC4
+                "0".to_string(), // ex_emg_kind
+            ])?;
+        } else if channel.mode == ChannelMode::DMR {
+            writer.write_record(&[
+                channel.index.to_string(), // No.
+                channel.name.clone(), // Channel Name
+                format!("{:0.6}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
+                format!("{:0.6}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
+                "D-Digital".to_string(), // Channel Type
+                "High".to_string(), // Transmit Power @TODO
+                "".to_string(), // Band Width
+                "".to_string(), // CTCSS/DCS Decode
+                "".to_string(), // CTCSS/DCS Encode
+                channel.dmr.as_ref().unwrap().talkgroup.as_ref().unwrap().to_string(), // Contact
+                "Group Call".to_string(), // Contact Call Type
+                "".to_string(), // Contact TG/DMR ID
+                "".to_string(), // Radio ID
+                "".to_string(), // Busy Lock/TX Permit
+                "".to_string(), // Squelch Mode
+                "".to_string(), // Optional Signal
+                "1".to_string(), // DTMF ID
+                "1".to_string(), // 2Tone ID
+                "1".to_string(), // 5Tone ID
+                "Off".to_string(), // PTT ID
+                channel.dmr.as_ref().unwrap().color_code.to_string(), // Color Code
+                channel.dmr.as_ref().unwrap().timeslot.to_string(), // Slot
+                "".to_string(), // Scan List
+                "".to_string(), // Receive Group List
+                if channel.rx_only { "On" } else { "Off" }.to_string(), // PTT Prohibit
+                "Off".to_string(), // Reverse
+                "Off".to_string(), // Simplex TDMA
+                "Off".to_string(), // Slot Suit
+                "Normal Encryption".to_string(), // AES Digital Encryption
+                "Off".to_string(), // Digital Encryption Type
+                "Off".to_string(), // Call Confirmation
+                "Off".to_string(), // Talk Around(Simplex)
+                "Off".to_string(), // Work Alone
+                "251.1".to_string(), // Custom CTCSS
+                "0".to_string(), // 2TONE Decode
+                "Off".to_string(), // Ranging
+                "Off".to_string(), // Through Mode
+                "Off".to_string(), // APRS RX
+                "Off".to_string(), // Analog APRS PTT Mode
+                "Off".to_string(), // Digital APRS PTT Mode
+                "Off".to_string(), // APRS Report Type
+                "1".to_string(), // Digital APRS Report Channel
+                "0".to_string(), // Correct Frequency[Hz]
+                "Off".to_string(), // SMS Confirmation
+                "0".to_string(), // Exclude channel from roaming
+                "0".to_string(), // DMR MODE
+                "0".to_string(), // DataACK Disable
+                "0".to_string(), // R5toneBot
+                "0".to_string(), // R5ToneEot
+                "0".to_string(), // Auto Scan
+                "0".to_string(), // Ana Aprs Mute
+                "0".to_string(), // Send Talker Alias
+                "0".to_string(), // AnaAprsTxPath
+                "0".to_string(), // ARC4
+                "0".to_string(), // ex_emg_kind
+            ])?;
+        } else {
+            cprintln!(ANSI_C_YLW, "Unsupported channel mode: index = {}, mode = {:?}", channel.index, channel.mode);
+        }
     }
 
     writer.flush()?;

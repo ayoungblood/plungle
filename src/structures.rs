@@ -114,3 +114,13 @@ pub struct Codeplug {
     pub talkgroup_lists: Vec<DmrTalkgroupList>,
     pub config: Option<Configuration>,
 }
+
+/// Radio Properties (e.g. supported modes, bands, counts)
+#[derive(Debug, Default)]
+pub struct RadioProperties {
+    // pub modes: Vec<ChannelMode>,
+    pub channels_max: usize,
+    pub channel_name_width_max: usize,
+    // dynamically set
+    pub channel_index_width: usize,
+}

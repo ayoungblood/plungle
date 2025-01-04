@@ -38,6 +38,10 @@ struct Opt {
     /// Verbose mode (-v, -vv, -vvv)
     #[structopt(short, long, parse(from_occurrences))]
     verbose: u8,
+
+    /// Excel mode
+    #[structopt(long)]
+    excel: bool,
 }
 
 fn dump(codeplug: &structures::Codeplug, opt: &Opt) -> Result<structures::Codeplug, Box<dyn Error>> {
