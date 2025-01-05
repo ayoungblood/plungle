@@ -3,10 +3,10 @@ Channel Number,Channel Name,Channel Type,Rx Frequency,Tx Frequency,Bandwidth (kH
 2,UHF Simplex,Analogue,	446.00000,	446.00000,25,,,,,,,,None,None,Disabled,Master,No,No,No,0,Off,No,No,None,0,0,No
 3,A Tone C-C,Analogue,	145.11500,	144.51500,25,,,,,,,,67.0,254.1,Disabled,Master,No,No,No,60,Off,No,No,None,0,0,No
 4,A Tone D-D,Analogue,	147.39000,	147.99000,25,,,,,,,,D023N,D754I,Disabled,Master,No,No,No,60,Off,No,No,None,0,0,No
-5,A Tone C-D,Analogue,	145.13000,	144.51500,25,,,,,,,,100.0,D754N,Disabled,Master,No,No,No,60,Off,No,No,None,0,0,No
+5,A Tone C-D,Analogue,	145.13000,	144.53000,25,,,,,,,,100.0,D754N,Disabled,Master,No,No,No,60,Off,No,No,None,0,0,No
 6,A Tone D-C,Analogue,	147.00000,	147.60000,25,,,,,,,,D023I,88.5,Disabled,Master,No,No,No,60,Off,No,No,None,0,0,No
 7,UHF RX Only,Analogue,	440.70000,	440.70000,25,,,,,,,,67.0,254.1,Disabled,Master,Yes,No,No,60,Off,No,No,None,0,0,No
-8,FRS 01,Analogue,	462.56250,	462.56250,12.5,,,,,,,,None,254.1,Disabled,P3,No,No,No,60,Off,No,No,None,0,0,No
+8,FRS 01,Analogue,	462.56250,	462.56250,12.5,,,,,,,,162.2,162.2,Disabled,P3,No,No,No,60,Off,No,No,None,0,0,No
 9,Squelch Open,Analogue,	145.11500,	144.51500,25,,,,,,,,67.0,254.1,Open,P5,No,No,No,60,Off,No,No,None,0,0,No
 10,Squelch 15%,Analogue,	145.11500,	144.51500,25,,,,,,,,67.0,254.1,15%,P7,No,No,No,60,Off,No,No,None,0,0,No
 11,Squelch Closed,Analogue,	145.11500,	144.51500,25,,,,,,,,67.0,254.1,Closed,-W+,No,No,No,60,Off,No,No,None,0,0,No
@@ -14,3 +14,6 @@ Channel Number,Channel Name,Channel Type,Rx Frequency,Tx Frequency,Bandwidth (kH
 13,D Rep C15S2,Digital,	438.70000,	433.70000,,15,2,None,TGIF,None,Off,Off,,,,Master,No,No,No,120,Off,No,No,None,0,0,No
 14,D Rep Private,Digital,	438.70000,	433.70000,,0,1,Private1234,None,None,Off,Off,,,,Master,No,No,Yes,120,Off,No,No,None,0,0,No
 15,D Rep ALLCALL,Digital,	438.70000,	433.70000,,1,2,ALL CALL,None,None,Off,Off,,,,Master,No,Yes,Yes,120,Off,No,No,None,0,0,No
+16,A Tone RX,Analogue,	147.00000,	147.60000,25,,,,,,,,77.0,None,5%,Master,No,No,No,60,Off,No,No,None,0,0,No
+17,A Tone TX,Analogue,	147.00000,	147.60000,25,,,,,,,,None,123.0,80%,Master,No,No,No,60,Off,No,No,None,0,0,No
+18,D Rep BM World,Digital,	438.70000,	433.70000,,0,2,BM World,None,None,Off,Off,,,,Master,No,No,No,120,Off,No,No,None,0,0,No
