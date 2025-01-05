@@ -83,7 +83,7 @@ fn get_props() -> &'static structures::RadioProperties {
 // - Simplex TDMA: [Off, ??]
 // - Slot Suit: [Off, ??]
 // - AES Digital Encryption: Normal Encryption
-// - Digital Encryption Type: [Off, ???]
+// - Digital Encryption: [Off, ???]
 // - Call Confirmation: [Off, ???]
 // - Talk Around(Simplex): [Off, ???]
 // - Work Alone: [Off, ???]
@@ -444,7 +444,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
 
 pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 3, "Writing {}", path.display());
+    dprintln!(opt.verbose, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
         .quote_style(csv::QuoteStyle::Always) // Anytone CPS expects all fields to be quoted
@@ -461,7 +461,7 @@ pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Resul
     ])?;
 
     for (ii, talkgroup) in codeplug.talkgroups.iter().enumerate() {
-        dprintln!(opt.verbose, 4, "Writing talkgroup {:width$}: {}", talkgroup.id, talkgroup.name, width = get_props().channel_index_width);
+        dprintln!(opt.verbose, 4, "Writing talkgroup {:width$}: {}", talkgroup.id, talkgroup.name, width = 8);
         writer.write_record(&[
             format!("{}", ii + 1), // No.
             talkgroup.id.to_string(), // Radio ID
@@ -472,6 +472,48 @@ pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Resul
                 DmrTalkgroupCallType::AllCall => "All Call".to_string(),
             }, // Call Type
             "None".to_string(), // Call Alert
+        ])?;
+    }
+
+    writer.flush()?;
+
+    Ok(())
+}
+
+pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+
+    let mut writer = csv::WriterBuilder::new()
+        .quote_style(csv::QuoteStyle::Always) // Anytone CPS expects all fields to be quoted
+        .terminator(csv::Terminator::CRLF)
+        .from_path(path)?;
+
+    // write the header
+    writer.write_record(&[
+        "No.",
+        "Group Name",
+        "Contact",
+        "Contact TG/DMR ID",
+    ])?;
+
+    for (ii, talkgroup_list) in codeplug.talkgroup_lists.iter().enumerate() {
+        dprintln!(opt.verbose, 4, "Writing talkgroup list {:width$}: {}", ii + 1, talkgroup_list.name, width = 3);
+        let mut contact = String::new();
+        let mut contact_id = String::new();
+        for (jj, talkgroup) in talkgroup_list.talkgroups.iter().enumerate() {
+            if jj > 0 {
+                contact.push_str("|");
+                contact_id.push_str("|");
+            }
+            contact.push_str(&talkgroup.name);
+            contact_id.push_str(&talkgroup.id.to_string());
+        }
+        writer.write_record(&[
+            format!("{}", ii + 1), // No.
+            talkgroup_list.name.clone(), // Group Name
+            contact, // Contact
+            contact_id, // Contact TG/DMR ID
         ])?;
     }
 
@@ -494,44 +536,14 @@ pub fn write_power(channel: &Channel) -> String {
     }
 }
 
-pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
+pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 4, "{:?}", get_props());
+    dprintln!(opt.verbose, 1, "Writing {}", path.display());
 
-    // if the output path exists, check if it is an empty directory
-    // if it does not exist, create it
-    if let Some(output_path) = &opt.output {
-        if output_path.exists() {
-            if output_path.is_dir() {
-                // check if the directory is empty
-                let dir_entries = std::fs::read_dir(output_path)?;
-                if dir_entries.count() > 0 {
-                    cprintln!(ANSI_C_RED, "Output path exists and is not empty, not overwriting!");
-                    return Err("Bad output path".into());
-                }
-            }
-        } else {
-            // if it does not exist, create it
-            std::fs::create_dir_all(output_path)?;
-        }
-        if fs::metadata(output_path)?.permissions().readonly() {
-            cprintln!(ANSI_C_RED, "Output path is read-only, cannot write!");
-            return Err("Bad output path".into());
-        }
-    }
-
-    // write to TalkGroups.CSV
-    let mut talkgroups_path: PathBuf = opt.output.clone().unwrap();
-    talkgroups_path.push(if opt.excel { "TalkGroups2.CSV" } else { "TalkGroups.CSV" });
-    write_talkgroups(codeplug, &talkgroups_path, opt)?;
-
-    // write to Channel.CSV
-    let mut channels_path: PathBuf = opt.output.clone().unwrap();
-    channels_path.push(if opt.excel { "Channel2.CSV" } else { "Channel.CSV" });
-    dprintln!(opt.verbose, 3, "Writing {}", channels_path.display());
     let mut writer = csv::WriterBuilder::new()
         .quote_style(csv::QuoteStyle::Always)
-        .from_path(channels_path)?;
+        .terminator(csv::Terminator::CRLF)
+        .from_path(path)?;
 
     // write the header
     writer.write_record(&[
@@ -564,7 +576,7 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
         "Simplex TDMA",
         "Slot Suit",
         "AES Digital Encryption",
-        "Digital Encryption Type",
+        "Digital Encryption",
         "Call Confirmation",
         "Talk Around(Simplex)",
         "Work Alone",
@@ -589,7 +601,7 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
         "Send Talker Alias",
         "AnaAprsTxPath",
         "ARC4",
-        "ex_emg_kind"
+        "ex_emg_kind",
     ])?;
 
     for channel in &codeplug.channels {
@@ -598,8 +610,8 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
             writer.write_record(&[
                 channel.index.to_string(), // No.
                 channel.name.clone(), // Channel Name
-                format!("{:0.6}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
-                format!("{:0.6}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
+                format!("{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
+                format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
                 "A-Analog".to_string(), // Channel Type
                 write_power(channel), // Transmit Power
                 format!("{}K", (channel.fm.as_ref().unwrap().bandwidth / Decimal::new(1_000, 0)).to_f64().unwrap()), // Band Width
@@ -643,7 +655,7 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
                 "Off".to_string(), // Simplex TDMA
                 "Off".to_string(), // Slot Suit
                 "Normal Encryption".to_string(), // AES Digital Encryption
-                "Off".to_string(), // Digital Encryption Type
+                "Off".to_string(), // Digital Encryption
                 "Off".to_string(), // Call Confirmation
                 "Off".to_string(), // Talk Around(Simplex)
                 "Off".to_string(), // Work Alone
@@ -674,10 +686,10 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
             writer.write_record(&[
                 channel.index.to_string(), // No.
                 channel.name.clone(), // Channel Name
-                format!("{:0.6}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
-                format!("{:0.6}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
+                format!("{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
+                format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
                 "D-Digital".to_string(), // Channel Type
-                "High".to_string(), // Transmit Power @TODO
+                write_power(channel), // Transmit Power
                 "".to_string(), // Band Width
                 "".to_string(), // CTCSS/DCS Decode
                 "".to_string(), // CTCSS/DCS Encode
@@ -701,7 +713,7 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
                 "Off".to_string(), // Simplex TDMA
                 "Off".to_string(), // Slot Suit
                 "Normal Encryption".to_string(), // AES Digital Encryption
-                "Off".to_string(), // Digital Encryption Type
+                "Off".to_string(), // Digital Encryption
                 "Off".to_string(), // Call Confirmation
                 "Off".to_string(), // Talk Around(Simplex)
                 "Off".to_string(), // Work Alone
@@ -734,6 +746,126 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
     }
 
     writer.flush()?;
+
+    Ok(())
+}
+
+pub fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+
+    let mut writer = csv::WriterBuilder::new()
+        .quote_style(csv::QuoteStyle::Always) // Anytone CPS expects all fields to be quoted
+        .terminator(csv::Terminator::CRLF)
+        .from_path(path)?;
+
+    // write the header
+    writer.write_record(&[
+        "No.",
+        "Zone Name",
+        "Zone Channel Member",
+        "Zone Channel Member RX Frequency",
+        "Zone Channel Member TX Frequency",
+        "A Channel",
+        "A Channel RX Frequency",
+        "A Channel TX Frequency",
+        "B Channel",
+        "B Channel RX Frequency",
+        "B Channel TX Frequency",
+        "Zone Hide ",
+    ])?;
+
+    for (ii, zone) in codeplug.zones.iter().enumerate() {
+        dprintln!(opt.verbose, 4, "Writing zone {:width$}: {}", ii + 1, zone.name, width = 3);
+        let mut channel_names = String::new();
+        let mut channel_rx_frequencies = String::new();
+        let mut channel_tx_frequencies = String::new();
+        for (jj, name) in zone.channels.iter().enumerate() {
+            if jj > 0 {
+                channel_names.push_str("|");
+                channel_rx_frequencies.push_str("|");
+                channel_tx_frequencies.push_str("|");
+            }
+            let channel = codeplug.channels.iter().find(|&c| c.name == *name).unwrap();
+            channel_names.push_str(&channel.name);
+            channel_rx_frequencies.push_str(&format!("{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()));
+            channel_tx_frequencies.push_str(&format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()));
+        }
+        // get the first channel in the zone
+        let first_channel = codeplug.channels.iter().find(|&c| c.name == zone.channels[0]).unwrap();
+        // get the second channel in the zone, or the first channel if there is only one
+        let second_channel = codeplug.channels.iter().find(|&c| c.name == *zone.channels.get(1).unwrap_or(&zone.channels[0])).unwrap();
+        writer.write_record(&[
+            format!("{}", ii + 1), // No.
+            zone.name.clone(), // Zone Name
+            channel_names, // Zone Channel Member
+            channel_rx_frequencies, // Zone Channel Member RX Frequency
+            channel_tx_frequencies, // Zone Channel Member TX Frequency
+            first_channel.name.clone(), // A Channel
+            format!("{:0.5}", (first_channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // A Channel RX Frequency
+            format!("{:0.5}", (first_channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // A Channel TX Frequency
+            second_channel.name.clone(), // B Channel
+            format!("{:0.5}", (second_channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // B Channel RX Frequency
+            format!("{:0.5}", (second_channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // B Channel TX Frequency
+            "0".to_string(), // Zone Hide
+        ])?;
+    }
+
+    writer.flush()?;
+    Ok(())
+}
+
+pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 4, "{:?}", get_props());
+
+    // if the output path exists, check if it is an empty directory
+    // if it does not exist, create it
+    if let Some(output_path) = &opt.output {
+        if output_path.exists() {
+            if output_path.is_dir() {
+                // check if the directory is empty
+                let dir_entries = std::fs::read_dir(output_path)?;
+                if dir_entries.count() > 0 {
+                    cprintln!(ANSI_C_RED, "Output path exists and is not empty, not overwriting!");
+                    return Err("Bad output path".into());
+                }
+            }
+        } else {
+            // if it does not exist, create it
+            std::fs::create_dir_all(output_path)?;
+        }
+        if fs::metadata(output_path)?.permissions().readonly() {
+            cprintln!(ANSI_C_RED, "Output path is read-only, cannot write!");
+            return Err("Bad output path".into());
+        }
+    }
+
+    // write to TalkGroups.CSV
+    let mut talkgroups_path: PathBuf = opt.output.clone().unwrap();
+    talkgroups_path.push(if opt.excel { "TalkGroups2.CSV" } else { "TalkGroups.CSV" });
+    if codeplug.talkgroups.len() > 0 {
+        write_talkgroups(codeplug, &talkgroups_path, opt)?;
+    }
+
+    // write to ReceiveGroupCallList.CSV
+    let mut talkgroup_lists_path: PathBuf = opt.output.clone().unwrap();
+    talkgroup_lists_path.push(if opt.excel { "ReceiveGroupCallList2.CSV" } else { "ReceiveGroupCallList.CSV" });
+    if codeplug.talkgroups.len() > 0 {
+        write_talkgroup_lists(codeplug, &talkgroup_lists_path, opt)?;
+    }
+
+    // write to Channel.CSV
+    let mut channels_path: PathBuf = opt.output.clone().unwrap();
+    channels_path.push(if opt.excel { "Channel2.CSV" } else { "Channel.CSV" });
+    write_channels(codeplug, &channels_path, opt)?;
+
+    // write to Zone.CSV
+    let mut zones_path: PathBuf = opt.output.clone().unwrap();
+    zones_path.push(if opt.excel { "Zone2.CSV" } else { "Zone.CSV" });
+    if codeplug.zones.len() > 0 {
+        write_zones(codeplug, &zones_path, opt)?;
+    }
 
     Ok(())
 }
