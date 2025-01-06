@@ -9,7 +9,7 @@ Channel Number,Channel Name,Channel Type,Rx Frequency,Tx Frequency,Bandwidth (kH
 8,FRS 01,Analogue,	462.56250,	462.56250,12.5,,,,,,,,162.2,162.2,Disabled,P3,No,No,No,60,Off,No,No,None,0,0,No
 9,Squelch Open,Analogue,	145.11500,	144.51500,25,,,,,,,,67.0,254.1,Open,P5,No,No,No,60,Off,No,No,None,0,0,No
 10,Squelch 15%,Analogue,	145.11500,	144.51500,25,,,,,,,,67.0,254.1,15%,P7,No,No,No,60,Off,No,No,None,0,0,No
-11,Squelch Closed,Analogue,	145.11500,	144.51500,25,,,,,,,,67.0,254.1,Closed,-W+,No,No,No,60,Off,No,No,None,0,0,No
+11,Squelch Closed,Analogue,	145.11500,	144.51500,25,,,,,,,,67.0,254.1,Closed,P1,No,No,Yes,60,Off,No,No,None,0,0,No
 12,D Rep C1S1,Digital,	438.70000,	433.70000,,1,1,None,Brandmeister,None,Off,Off,,,,Master,No,No,No,120,Off,No,No,None,0,0,No
 13,D Rep C15S2,Digital,	438.70000,	433.70000,,15,2,None,TGIF,None,Off,Off,,,,Master,No,No,No,120,Off,No,No,None,0,0,No
 14,D Rep Private,Digital,	438.70000,	433.70000,,0,1,Private1234,None,None,Off,Off,,,,Master,No,No,Yes,120,Off,No,No,None,0,0,No
