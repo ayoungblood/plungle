@@ -51,6 +51,7 @@ fn dump(codeplug: &structures::Codeplug, opt: &Opt) -> Result<structures::Codepl
         talkgroups: Vec::new(),
         talkgroup_lists: Vec::new(),
         config: None,
+        source: "".to_string(),
     };
     // we are dumping everything
     if opt.dump.is_none() || opt.dump.as_ref().unwrap() == "all" {

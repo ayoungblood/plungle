@@ -4,6 +4,7 @@
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
+use std::path::Path;
 use std::collections::HashMap;
 use rust_decimal::prelude::*;
 use std::sync::OnceLock;
@@ -40,7 +41,7 @@ fn get_props() -> &'static structures::RadioProperties {
 // - Channel Type: [Analogue,Digital]
 // - Rx Frequency: frequency in MHz, zero-padded to five decimal places
 // - Tx Frequency: frequency in MHz, zero-padded to five decimal places
-// - Bandwidth: [12.5,25], blank for Digital
+// - Bandwidth (kHz): [12.5,25], blank for Digital
 // - Colour Code: [0-15], blank for Analogue
 // - Timeslot: [1,2], blank for Analogue
 // - Contact: talkgroup name, blank for Analogue, None for when TG List below is set
@@ -48,8 +49,8 @@ fn get_props() -> &'static structures::RadioProperties {
 // - DMR ID: None
 // - TS1_TA_Tx: timeslot 1 talker alias, [Off, ???] @TODO
 // - TS2_TA_Tx ID: timeslot 2 talker alias, [Off, ???] @TODO
-// - Rx Tone: None, CTCSS frequency in Hz, or DCS code (DnnnN or DnnnI), blank for Digital
-// - Tx Tone: None, CTCSS frequency in Hz, or DCS code (DnnnN or DnnnI), blank for Digital
+// - RX Tone: None, CTCSS frequency in Hz, or DCS code (DnnnN or DnnnI), blank for Digital
+// - TX Tone: None, CTCSS frequency in Hz, or DCS code (DnnnN or DnnnI), blank for Digital
 // - Squelch: blank for Digital, [Disabled,Open,Closed,5%..95%] (default is Disabled)
 // - Power: [Master,P1,P2,P3,P4,P5,P6,P7,P8,P9,-W+] corresponding to [default,50mW,250mW,500mW,750mW,1W,2W,3W,4W,5W,+W-]
 //   - OpenGD77 uses +W- for user configurable power which may be ~6W on the RT3S at max PA drive, but may also be lower than 50mW if configured
@@ -63,7 +64,7 @@ fn get_props() -> &'static structures::RadioProperties {
 // - APRS: None, ??? @TODO
 // - Latitude: ??? @TODO
 // - Longitude: ??? @TODO
-// - Use Location: Yes, ??? @TODO
+// - Use location: [No, Yes]
 
 // Contacts.csv
 // - Contact Name: talkgroup name
@@ -102,17 +103,17 @@ pub fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug) -> R
         name: record.get("TG List Name").unwrap().to_string(),
         talkgroups: Vec::new(),
     };
-    // iterate over the contacts in the CSV record
-    for (key, value) in record {
-        if key.starts_with("Contact") {
-            if value != "" {
-                // find the talkgroup in codeplug.talkgroups
-                let talkgroup = codeplug.talkgroups.iter().find(|&x| x.name == *value);
-                if let Some(tg) = talkgroup {
-                    talkgroup_list.talkgroups.push(tg.clone());
-                } else {
-                    cprintln!(ANSI_C_YLW, "Talkgroup not found: {}", value);
-                }
+    // iterate over the contacts in the CSV record, up to 32 (do not use for (k,v) in .. because it doesn't care about order)
+    for ii in 1..=32 {
+        let key = format!("Contact{}", ii);
+        let value = record.get(&key).unwrap();
+        if value != "" {
+            // find the talkgroup in codeplug.talkgroups
+            let talkgroup = codeplug.talkgroups.iter().find(|&x| x.name == *value);
+            if let Some(tg) = talkgroup {
+                talkgroup_list.talkgroups.push(tg.clone());
+            } else {
+                cprintln!(ANSI_C_YLW, "Talkgroup not found: {}", value);
             }
         }
     }
@@ -143,6 +144,37 @@ fn parse_tone(tone: &str) -> Option<Tone> {
     })
 }
 
+// Convert a squelch string into a Squelch struct
+// OpenGD77 stores squelch as follows:
+// - "Disabled" for default squelch (set by menu)
+// - "Open" for squelch open (0%)
+// - "Closed" for squelch closed (100%)
+// - "5%".."95%" for squelch level
+fn parse_squelch(squelch: &str) -> Squelch {
+    if squelch == "Disabled" {
+        return Squelch {
+            default: true,
+            percent: None,
+        }
+    }
+    if squelch == "Open" {
+        return Squelch {
+            default: false,
+            percent: Some(0),
+        }
+    }
+    if squelch == "Closed" {
+        return Squelch {
+            default: false,
+            percent: Some(100),
+        }
+    }
+    Squelch {
+        default: false,
+        percent: Some(squelch.trim_end_matches('%').parse().unwrap()),
+    }
+}
+
 pub fn parse_channel_record(record: &CsvRecord) -> Result<Channel, Box<dyn Error>> {
     let mut channel = Channel {
         index: 0,
@@ -151,9 +183,11 @@ pub fn parse_channel_record(record: &CsvRecord) -> Result<Channel, Box<dyn Error
         frequency_rx: Decimal::new(0,0),
         frequency_tx: Decimal::new(0,0),
         rx_only: false,
-        power: Decimal::new(0,0),
+        tx_tot: Timeout {default: true, seconds: None},
+        power: Power {default: true, watts: None},
         fm: None,
         dmr: None,
+        scan: None,
     };
 
     // shared fields
@@ -167,25 +201,33 @@ pub fn parse_channel_record(record: &CsvRecord) -> Result<Channel, Box<dyn Error
     channel.frequency_rx = Decimal::from_str(record.get("Rx Frequency").unwrap().trim())? * Decimal::new(1_000_000, 0);
     channel.frequency_tx = Decimal::from_str(record.get("Tx Frequency").unwrap().trim())? * Decimal::new(1_000_000, 0);
     channel.rx_only = record.get("Rx Only").unwrap() == "Yes";
+    if record.get("TOT").unwrap() != "0" {
+        channel.tx_tot = Timeout {default: false, seconds: Some(record.get("TOT").unwrap().parse::<u32>()?)};
+    }
     channel.power = match record.get("Power").unwrap().as_str() {
-        "Master" => Decimal::new(5, 0),
-        "P1" => Decimal::new(50,0) / Decimal::new(1_000,0), // 50mW
-        "P2" => Decimal::new(250,0) / Decimal::new(1_000,0), // 250mW
-        "P3" => Decimal::new(500,0) / Decimal::new(1_000,0), // 500mW
-        "P4" => Decimal::new(750,0) / Decimal::new(1_000,0), // 750mW
-        "P5" => Decimal::new(1,0),
-        "P6" => Decimal::new(2,0),
-        "P7" => Decimal::new(3,0),
-        "P8" => Decimal::new(4,0),
-        "P9" => Decimal::new(5,0),
-        "-W+" => Decimal::new(6,0), // @TODO maybe this should throw a warning?
-        _ => return Err(format!("Unrecognized power level: {}", record.get("Power").unwrap()).into()),
+        "Master" => Power {default: true, watts: None},
+        "P1" => Power {default: false, watts: Some(Decimal::new(50,3))}, // 50mW
+        "P2" => Power {default: false, watts: Some(Decimal::new(250,3))}, // 250mW
+        "P3" => Power {default: false, watts: Some(Decimal::new(500,3))}, // 500mW
+        "P4" => Power {default: false, watts: Some(Decimal::new(750,3))}, // 750mW
+        "P5" => Power {default: false, watts: Some(Decimal::new(1,0))}, // 1W
+        "P6" => Power {default: false, watts: Some(Decimal::new(2,0))}, // 2W
+        "P7" => Power {default: false, watts: Some(Decimal::new(3,0))}, // 3W
+        "P8" => Power {default: false, watts: Some(Decimal::new(4,0))}, // 4W
+        "P9" => Power {default: false, watts: Some(Decimal::new(5,0))}, // 5W
+        _ => return Err(format!("Unrecognized power level: {}", record.get("Power").unwrap()).into()), // +W- not supported yet
     };
+    if record.get("Zone Skip").unwrap() == "Yes" || record.get("All Skip").unwrap() == "Yes" {
+        channel.scan = Some(Scan {
+            zone_skip: record.get("Zone Skip").unwrap() == "Yes",
+            all_skip: record.get("All Skip").unwrap() == "Yes",
+        });
+    }
 
     if channel.mode == ChannelMode::FM { // FM specific fields
         channel.fm = Some(FmChannel {
             bandwidth: Decimal::from_str(record.get("Bandwidth (kHz)").unwrap())? * Decimal::new(1_000, 0),
-            squelch_level: 0, // @TODO
+            squelch: parse_squelch(record.get("Squelch").unwrap().as_str()),
             tone_rx: parse_tone(record.get("RX Tone").unwrap().as_str()),
             tone_tx: parse_tone(record.get("TX Tone").unwrap().as_str()),
         });
@@ -214,17 +256,17 @@ pub fn parse_zone_record(record: &CsvRecord, codeplug: &Codeplug) -> Result<Zone
         name: record.get("Zone Name").unwrap().to_string(),
         channels: Vec::new(),
     };
-    // iterate over the channels in the CSV record
-    for (key, value) in record {
-        if key.starts_with("Channel") {
-            if value != "" {
-                // find the channel in codeplug.channels
-                let channel = codeplug.channels.iter().find(|&x| x.name == *value);
-                if let Some(ch) = channel {
-                    zone.channels.push(ch.name.clone());
-                } else {
-                    cprintln!(ANSI_C_YLW, "Channel not found: {}", value);
-                }
+    // iterate over the channels in the CSV record, up to 80 (do not use for (k,v) in .. because it doesn't care about order)
+    for ii in 1..=80 {
+        let key = format!("Channel{}", ii);
+        let value = record.get(&key).unwrap();
+        if value != "" {
+            // find the channel in codeplug.channels
+            let channel = codeplug.channels.iter().find(|&x| x.name == *value);
+            if let Some(ch) = channel {
+                zone.channels.push(ch.name.clone());
+            } else {
+                cprintln!(ANSI_C_YLW, "Channel not found: {}", value);
             }
         }
     }
@@ -241,6 +283,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         talkgroups: Vec::new(),
         talkgroup_lists: Vec::new(),
         config: None,
+        source: format!("{}", Path::new(file!()).file_stem().unwrap().to_str().unwrap()),
     };
 
     // check that the input path is a directory
@@ -325,37 +368,136 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
 
 // WRITE //////////////////////////////////////////////////////////////////////
 
-pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
+pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 4, "{:?}", get_props());
+    dprintln!(opt.verbose, 1, "Writing {}", path.display());
 
-    // if the output path exists, check if it is an empty directory
-    // if it does not exist, create it
-    if let Some(output_path) = &opt.output {
-        if output_path.exists() {
-            if output_path.is_dir() {
-                // check if the directory is empty
-                let dir_entries = std::fs::read_dir(output_path)?;
-                if dir_entries.count() > 0 {
-                    cprintln!(ANSI_C_RED, "Output path exists and is not empty, not overwriting!");
-                    return Err("Bad output path".into());
-                }
-            }
-        } else {
-            // if it does not exist, create it
-            std::fs::create_dir_all(output_path)?;
-        }
-        if fs::metadata(output_path)?.permissions().readonly() {
-            cprintln!(ANSI_C_RED, "Output path is read-only, cannot write!");
-            return Err("Bad output path".into());
-        }
+    let mut writer = csv::WriterBuilder::new()
+        .terminator(csv::Terminator::CRLF)
+        .from_path(path)?;
+
+    // write the header
+    writer.write_record(&[
+        "Contact Name",
+        "ID",
+        "ID Type",
+        "TS Override",
+    ])?;
+
+    for talkgroup in &codeplug.talkgroups {
+        dprintln!(opt.verbose, 4, "Writing talkgroup: {}", talkgroup.name);
+        writer.write_record(&[
+            talkgroup.name.clone(), // Contact Name
+            talkgroup.id.to_string(), // ID
+            match talkgroup.call_type {
+                DmrTalkgroupCallType::Group => "Group",
+                DmrTalkgroupCallType::Private => "Private",
+                DmrTalkgroupCallType::AllCall => "AllCall",
+            }.to_string(), // ID Type
+            "Disabled".to_string(), // TS Override
+        ])?;
     }
 
-    // write to Channels.csv
-    let mut channels_path: PathBuf = opt.output.as_ref().unwrap().clone();
-    channels_path.push("Channels.csv");
-    dprintln!(opt.verbose, 3, "Writing {}", channels_path.display());
-    let mut writer = csv::Writer::from_path(channels_path)?;
+    writer.flush()?;
+
+    Ok(())
+}
+
+pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+
+    let mut writer = csv::WriterBuilder::new()
+        .terminator(csv::Terminator::CRLF)
+        .from_path(path)?;
+
+    // write the header
+    let mut header: Vec<String> = vec!["TG List Name".to_string()];
+    for ii in 1..=32 {
+        header.push(format!("Contact{}", ii));
+    }
+    writer.write_record(&header)?;
+
+    for talkgroup_list in &codeplug.talkgroup_lists {
+        dprintln!(opt.verbose, 4, "Writing talkgroup list: {}", talkgroup_list.name);
+        let mut record = vec![talkgroup_list.name.clone()];
+        for tg in &talkgroup_list.talkgroups {
+            record.push(tg.name.clone());
+        }
+        // pad the record with empty strings to 32 elements
+        while record.len() < 33 {
+            record.push("".to_string());
+        }
+        writer.write_record(&record)?;
+    }
+
+    writer.flush()?;
+
+    Ok(())
+}
+
+fn write_tone(tone: &Option<Tone>) -> String {
+    match tone {
+        Some(t) => {
+            if t.mode == ToneMode::CTCSS {
+                t.ctcss.as_ref().unwrap().to_string()
+            } else {
+                t.dcs.as_ref().unwrap().to_string()
+            }
+        },
+        None => "None".to_string(),
+    }
+}
+
+fn write_squelch(squelch: &Squelch) -> String {
+    if squelch.default {
+        "Disabled".to_string()
+    } else {
+        // 0 is Open, 100 is Closed
+        let percent = (squelch.percent.unwrap() / 5) * 5;
+        match percent {
+            0 => "Open".to_string(),
+            100 => "Closed".to_string(),
+            p => format!("{}%", p),
+        }
+    }
+}
+
+fn write_power(power: &Power) -> String {
+    if power.default {
+        "Master".to_string()
+    } else {
+        if power.watts >= Some(Decimal::new(5, 0)) {
+            "P9".to_string()
+        } else if power.watts >= Some(Decimal::new(4, 0)) {
+            "P8".to_string()
+        } else if power.watts >= Some(Decimal::new(3, 0)) {
+            "P7".to_string()
+        } else if power.watts >= Some(Decimal::new(2, 0)) {
+            "P6".to_string()
+        } else if power.watts >= Some(Decimal::new(1, 0)) {
+            "P5".to_string()
+        } else if power.watts >= Some(Decimal::new(750, 3)) {
+            "P4".to_string()
+        } else if power.watts >= Some(Decimal::new(500, 3)) {
+            "P3".to_string()
+        } else if power.watts >= Some(Decimal::new(250, 3)) {
+            "P2".to_string()
+        } else if power.watts >= Some(Decimal::new(50, 3)) {
+            "P1".to_string()
+        } else {
+            "Master".to_string()
+        }
+    }
+}
+
+pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+
+    let mut writer = csv::WriterBuilder::new()
+        .terminator(csv::Terminator::CRLF)
+        .from_path(path)?;
 
     // write the header
     writer.write_record(&[
@@ -364,7 +506,7 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
         "Channel Type",
         "Rx Frequency",
         "Tx Frequency",
-        "Bandwidth",
+        "Bandwidth (kHz)",
         "Colour Code",
         "Timeslot",
         "Contact",
@@ -372,8 +514,8 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
         "DMR ID",
         "TS1_TA_Tx",
         "TS2_TA_Tx ID",
-        "Rx Tone",
-        "Tx Tone",
+        "RX Tone",
+        "TX Tone",
         "Squelch",
         "Power",
         "Rx Only",
@@ -386,7 +528,7 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
         "APRS",
         "Latitude",
         "Longitude",
-        "Use Location",
+        "Use location",
     ])?;
 
     for channel in &codeplug.channels {
@@ -407,21 +549,21 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
                 "".to_string(), // DMR ID
                 "".to_string(), // TS1_TA_Tx
                 "".to_string(), // TS2_TA_Tx ID
-                "123".to_string(), // Rx Tone
-                "123".to_string(), // Tx Tone
-                "Disabled".to_string(), // Squelch
-                "Master".to_string(), // Power
+                write_tone(&channel.fm.as_ref().unwrap().tone_rx), // RX Tone
+                write_tone(&channel.fm.as_ref().unwrap().tone_tx), // TX Tone
+                write_squelch(&channel.fm.as_ref().unwrap().squelch), // Squelch
+                write_power(&channel.power), // Power
                 if channel.rx_only { "Yes".to_string() } else { "No".to_string() },
-                "No".to_string(), // Zone Skip
-                "No".to_string(), // All Skip
-                "0".to_string(), // TOT
+                if channel.scan.is_some() && channel.scan.as_ref().unwrap().zone_skip { "Yes".to_string() } else { "No".to_string() }, // Zone Skip
+                if channel.scan.is_some() && channel.scan.as_ref().unwrap().all_skip { "Yes".to_string() } else { "No".to_string() }, // All Skip
+                if channel.tx_tot.default { "0".to_string() } else { channel.tx_tot.seconds.unwrap().to_string() }, // TOT
                 "Off".to_string(), // VOX
                 "No".to_string(), // No Beep
                 "No".to_string(), // No Eco
                 "None".to_string(), // APRS
                 "0".to_string(), // Latitude
                 "0".to_string(), // Longitude
-                "Yes".to_string(), // Use Location
+                "No".to_string(), // Use Location
             ])?;
         } else if channel.mode == ChannelMode::DMR {
             writer.write_record(&[
@@ -450,18 +592,18 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
                 "".to_string(), // Rx Tone
                 "".to_string(), // Tx Tone
                 "".to_string(), // Squelch
-                "Master".to_string(), // Power
+                write_power(&channel.power), // Power
                 if channel.rx_only { "Yes".to_string() } else { "No".to_string() },
-                "No".to_string(), // Zone Skip
-                "No".to_string(), // All Skip
-                "0".to_string(), // TOT
+                if channel.scan.is_some() && channel.scan.as_ref().unwrap().zone_skip { "Yes".to_string() } else { "No".to_string() }, // Zone Skip
+                if channel.scan.is_some() && channel.scan.as_ref().unwrap().all_skip { "Yes".to_string() } else { "No".to_string() }, // All Skip
+                if channel.tx_tot.default { "0".to_string() } else { channel.tx_tot.seconds.unwrap().to_string() }, // TOT
                 "Off".to_string(), // VOX
                 "No".to_string(), // No Beep
                 "No".to_string(), // No Eco
                 "None".to_string(), // APRS
                 "0".to_string(), // Latitude
                 "0".to_string(), // Longitude
-                "Yes".to_string(), // Use Location
+                "No".to_string(), // Use location
             ])?;
         } else {
             cprintln!(ANSI_C_YLW, "Unsupported channel mode: index = {}, mode = {:?}", channel.index, channel.mode);
@@ -469,6 +611,92 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
     }
 
     writer.flush()?;
+
+    Ok(())
+}
+
+fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+
+    let mut writer = csv::WriterBuilder::new()
+        .terminator(csv::Terminator::CRLF)
+        .from_path(path)?;
+
+    // write the header
+    let mut header: Vec<String> = vec!["Zone Name".to_string()];
+    for ii in 1..=80 {
+        header.push(format!("Channel{}", ii));
+    }
+    writer.write_record(&header)?;
+
+    for zone in &codeplug.zones {
+        dprintln!(opt.verbose, 4, "Writing zone: {}", zone.name);
+        let mut record = vec![zone.name.clone()];
+        for ch in &zone.channels {
+            record.push(ch.clone());
+        }
+        // pad the record with empty strings to 80 elements
+        while record.len() < 81 {
+            record.push("".to_string());
+        }
+        writer.write_record(&record)?;
+    }
+
+    Ok(())
+}
+
+pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 4, "{:?}", get_props());
+
+    // if the output path exists, check if it is an empty directory
+    // if it does not exist, create it
+    if let Some(output_path) = &opt.output {
+        if output_path.exists() {
+            if output_path.is_dir() {
+                // check if the directory is empty
+                let dir_entries = std::fs::read_dir(output_path)?;
+                if dir_entries.count() > 0 {
+                    cprintln!(ANSI_C_RED, "Output path exists and is not empty, not overwriting!");
+                    return Err("Bad output path".into());
+                }
+            }
+        } else {
+            // if it does not exist, create it
+            std::fs::create_dir_all(output_path)?;
+        }
+        if fs::metadata(output_path)?.permissions().readonly() {
+            cprintln!(ANSI_C_RED, "Output path is read-only, cannot write!");
+            return Err("Bad output path".into());
+        }
+    }
+
+    // write to Contacts.csv
+    let mut talkgroups_path: PathBuf = opt.output.as_ref().unwrap().clone();
+    talkgroups_path.push(if opt.excel { "Contacts2.csv" } else { "Contacts.csv" });
+    if codeplug.talkgroups.len() > 0 {
+        write_talkgroups(&codeplug, &talkgroups_path, opt)?;
+    }
+
+    // write to TG_Lists.csv
+    let mut talkgroup_lists_path: PathBuf = opt.output.as_ref().unwrap().clone();
+    talkgroup_lists_path.push(if opt.excel { "TG_Lists2.csv" } else { "TG_Lists.csv" });
+    if codeplug.talkgroup_lists.len() > 0 {
+        write_talkgroup_lists(&codeplug, &talkgroup_lists_path, opt)?;
+    }
+
+    // write to Channels.csv
+    let mut channels_path: PathBuf = opt.output.as_ref().unwrap().clone();
+    channels_path.push(if opt.excel { "Channels2.csv" } else { "Channels.csv" });
+    write_channels(&codeplug, &channels_path, opt)?;
+
+    // write to Zones.csv
+    let mut zones_path: PathBuf = opt.output.as_ref().unwrap().clone();
+    zones_path.push(if opt.excel { "Zones2.csv" } else { "Zones.csv" });
+    if codeplug.zones.len() > 0 {
+        write_zones(&codeplug, &zones_path, opt)?;
+    }
 
     Ok(())
 }

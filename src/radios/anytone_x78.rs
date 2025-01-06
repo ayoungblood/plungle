@@ -4,6 +4,7 @@
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
+use std::path::Path;
 use std::collections::HashMap;
 use rust_decimal::prelude::*;
 use std::sync::OnceLock;
@@ -234,9 +235,11 @@ fn parse_channel_record(record: &CsvRecord) -> Result<Channel, Box<dyn Error>> {
         frequency_rx: Decimal::new(0,0),
         frequency_tx: Decimal::new(0,0),
         rx_only: false,
-        power: Decimal::new(0,0),
+        tx_tot: Timeout {default: true, seconds: None}, // default to no timeout
+        power: Power {default: true, watts: None},
         fm: None,
         dmr: None,
+        scan: None,
     };
 
     channel.index = record.get("No.").unwrap().parse::<u32>()?;
@@ -250,11 +253,11 @@ fn parse_channel_record(record: &CsvRecord) -> Result<Channel, Box<dyn Error>> {
     channel.frequency_tx = Decimal::from_str(record.get("Transmit Frequency").unwrap())? * Decimal::new(1_000_000, 0);
     channel.rx_only = record.get("PTT Prohibit").unwrap() == "On";
     channel.power = match record.get("Transmit Power").unwrap().as_str() {
-        "Turbo" => Decimal::from_str("7.0").unwrap(),
-        "High" => Decimal::from_str("5.0").unwrap(),
-        "Mid" => Decimal::from_str("2.5").unwrap(),
-        "Low" => Decimal::from_str("1.0").unwrap(),
-        _ => return Err(format!("Unrecognized power level: {}", record.get("Transmit Power").unwrap()).into()),
+        "Turbo" => Power {default: false, watts: Some(Decimal::new(7, 0))}, // 7W
+        "High" => Power {default: false, watts: Some(Decimal::new(5, 0))}, // 5W
+        "Mid" => Power {default: false, watts: Some(Decimal::new(25, 1))}, // 2.5W
+        "Low" => Power {default: false, watts: Some(Decimal::new(1, 0))}, // 1W
+        _ => return Err(format!("Unrecognized power: {}", record.get("Transmit Power").unwrap()).into()),
     };
     if channel.mode == ChannelMode::FM { // FM specific fields
         channel.fm = Some(FmChannel {
@@ -263,7 +266,10 @@ fn parse_channel_record(record: &CsvRecord) -> Result<Channel, Box<dyn Error>> {
                 "25K" => Decimal::from_str("25.0").unwrap() * Decimal::new(1_000, 0),
                 _ => return Err(format!("Unrecognized bandwidth: {}", record.get("Band Width").unwrap()).into()),
             },
-            squelch_level: 0, // @TODO
+            squelch: Squelch {
+                default: true,
+                percent: None,
+            },
             tone_rx: parse_tone(record.get("CTCSS/DCS Decode").unwrap().as_str()),
             tone_tx: parse_tone(record.get("CTCSS/DCS Encode").unwrap().as_str()),
         });
@@ -329,6 +335,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         talkgroups: Vec::new(),
         talkgroup_lists: Vec::new(),
         config: None,
+        source: format!("{}", Path::new(file!()).file_stem().unwrap().to_str().unwrap()),
     };
 
     // check that the input path is a directory
@@ -522,17 +529,21 @@ pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> 
     Ok(())
 }
 
-pub fn write_power(channel: &Channel) -> String {
-    if channel.power >= Decimal::from_str("7.0").unwrap() {
-        return "Turbo".to_string();
-    } else if channel.power >= Decimal::from_str("5.0").unwrap() {
-        return "High".to_string();
-    } else if channel.power >= Decimal::from_str("2.5").unwrap() {
-        return "Mid".to_string();
-    } else if channel.power >= Decimal::from_str("1.0").unwrap() {
-        return "Low".to_string();
+fn write_power(power: &Power) -> String {
+    if power.default { // default to 5W
+        "High".to_string()
     } else {
-        return "Low".to_string();
+        if power.watts >= Some(Decimal::new(7, 0)) {
+            "Turbo".to_string()
+        } else if power.watts >= Some(Decimal::new(5, 0)) {
+            "High".to_string()
+        } else if power.watts >= Some(Decimal::new(25, 1)) {
+            "Mid".to_string()
+        } else if power.watts >= Some(Decimal::new(1, 0)) {
+            "Low".to_string()
+        } else {
+            "Low".to_string()
+        }
     }
 }
 
@@ -613,7 +624,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 format!("{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
                 format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
                 "A-Analog".to_string(), // Channel Type
-                write_power(channel), // Transmit Power
+                write_power(&channel.power), // Transmit Power
                 format!("{}K", (channel.fm.as_ref().unwrap().bandwidth / Decimal::new(1_000, 0)).to_f64().unwrap()), // Band Width
                 if let Some(tone) = &channel.fm.as_ref().unwrap().tone_rx {
                     match tone.mode {
@@ -689,7 +700,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 format!("{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
                 format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
                 "D-Digital".to_string(), // Channel Type
-                write_power(channel), // Transmit Power
+                write_power(&channel.power), // Transmit Power
                 "".to_string(), // Band Width
                 "".to_string(), // CTCSS/DCS Decode
                 "".to_string(), // CTCSS/DCS Encode

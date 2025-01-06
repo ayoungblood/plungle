@@ -10,6 +10,13 @@ pub enum ChannelMode {
     DMR,
 }
 
+/// Squelch
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct Squelch {
+    pub default: bool,
+    pub percent: Option<u8>, // 0-100
+}
+
 /// Tone mode
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub enum ToneMode {
@@ -24,11 +31,12 @@ pub struct Tone {
     pub ctcss: Option<rust_decimal::Decimal>,
     pub dcs: Option<String>,
 }
+
 /// Channel FM properties
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct FmChannel {
     pub bandwidth: rust_decimal::Decimal,
-    pub squelch_level: u8, // @TODO this needs work
+    pub squelch: Squelch,
     pub tone_rx: Option<Tone>,
     pub tone_tx: Option<Tone>,
 }
@@ -42,6 +50,27 @@ pub struct DmrChannel {
     pub talkgroup_list: Option<String>,
 }
 
+/// Timeout
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct Timeout {
+    pub default: bool,
+    pub seconds: Option<u32>,
+}
+
+/// Power
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct Power {
+    pub default: bool,
+    pub watts: Option<rust_decimal::Decimal>,
+}
+
+/// Scan
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct Scan {
+    pub zone_skip: bool,
+    pub all_skip: bool,
+}
+
 /// Channel
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Channel {
@@ -51,9 +80,11 @@ pub struct Channel {
     pub frequency_rx: rust_decimal::Decimal,
     pub frequency_tx: rust_decimal::Decimal,
     pub rx_only: bool,
-    pub power: rust_decimal::Decimal,
+    pub tx_tot: Timeout,
+    pub power: Power,
     pub fm: Option<FmChannel>,
     pub dmr: Option<DmrChannel>,
+    pub scan: Option<Scan>,
 }
 
 /// Zone (a zone is a collection of channels)
@@ -113,6 +144,7 @@ pub struct Codeplug {
     pub talkgroups: Vec<DmrTalkgroup>,
     pub talkgroup_lists: Vec<DmrTalkgroupList>,
     pub config: Option<Configuration>,
+    pub source: String, // source radio
 }
 
 /// Radio Properties (e.g. supported modes, bands, counts)
