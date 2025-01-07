@@ -4,6 +4,11 @@
 
 Please also see [qdmr](https://dm3mat.darc.de/qdmr/), a tool by DM3MAT that reverse-engineers the codeplug formats of various radios and also provides a full UI and programming functionality. This may be easier to use if your radio is supported.
 
+`plungle` supports more than just DMR radios, supporting analog-only radios with plans to support other digital mode radios in the future (C4FM, D-STAR, etc). `plungle` also performs basic validation on the codeplug, providing rudimentary detection of fat-finger mistakes and bad source data.
+
+> [!WARNING]
+> This tool is provided without warranty, and the user assumes all risks. You must verify the resulting codeplug yourself, and ensure that you are transmitting within your license privileges.
+
 ## Installation
 
 ## Usage
@@ -20,7 +25,7 @@ Validate the codeplug
 plungle validate codeplug.json
 ```
 
-Write a codeplug for a different radio
+Write a codeplug CSV export for a different radio
 
 ```
 plungle write <radio-b> codeplug.json <output-dir>
@@ -54,10 +59,19 @@ plungle write opengd77-rt3s codeplug.json output
 
 Complete documentation is not yet written.
 
-## Issues
+## Status/Issues
+
+### Supported Radios
+
+* Anytone D878UV (other Dx78 radios are untested but should work)
+* Retevis RT3S running OpenGD77
 
 ## Future Plans
 
 * Support JSON, TOML, YAML, and CSV as intermediary data formats
-* Support Chirp input/output
+* Support generic Chirp input/output
 * Support merging multiple codeplugs
+* Support for Motorola XPR 6550/7550
+* Support for Retevis RT3S on stock firmware, and TYT MD-UV380/MD-UV390 on both stock and OpenGD77 firmware
+* Support for Ailunce HD1
+* Support for Yaesu FT-3D
