@@ -167,7 +167,8 @@ type CsvRecord = HashMap<String, String>;
 
 // READ ///////////////////////////////////////////////////////////////////////
 
-fn parse_talkgroup_record(record: &CsvRecord) -> Result<DmrTalkgroup, Box<dyn Error>> {
+fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup, Box<dyn Error>> {
+    dprintln!(opt.verbose, 4, "    {:?}", record);
     let talkgroup = DmrTalkgroup {
         id: record.get("Radio ID").unwrap().parse::<u32>()?,
         name: record.get("Name").unwrap().to_string(),
@@ -182,7 +183,8 @@ fn parse_talkgroup_record(record: &CsvRecord) -> Result<DmrTalkgroup, Box<dyn Er
     Ok(talkgroup)
 }
 
-fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug) -> Result<DmrTalkgroupList, Box<dyn Error>> {
+fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<DmrTalkgroupList, Box<dyn Error>> {
+    dprintln!(opt.verbose, 4, "    {:?}", record);
     let mut talkgroup_list = DmrTalkgroupList {
         name: record.get("Group Name").unwrap().to_string(),
         talkgroups: Vec::new(),
@@ -227,7 +229,8 @@ fn parse_tone(tone: &str) -> Option<Tone> {
 }
 
 // Convert the CSV channel hashmap into a Channel struct
-fn parse_channel_record(record: &CsvRecord) -> Result<Channel, Box<dyn Error>> {
+fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
+    dprintln!(opt.verbose, 4, "    {:?}", record);
     let mut channel = Channel {
         index: 0,
         name: String::new(),
@@ -294,7 +297,8 @@ fn parse_channel_record(record: &CsvRecord) -> Result<Channel, Box<dyn Error>> {
 }
 
 // Convert the CSV zone hashmap into a Zone struct
-fn parse_zone_record(csv_zone: &CsvRecord, codeplug: &Codeplug) -> Result<Zone, Box<dyn Error>> {
+fn parse_zone_record(csv_zone: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<Zone, Box<dyn Error>> {
+    dprintln!(opt.verbose, 4, "    {:?}", csv_zone);
     let mut zone = Zone {
         name: String::new(),
         channels: Vec::new(),
@@ -316,7 +320,8 @@ fn parse_zone_record(csv_zone: &CsvRecord, codeplug: &Codeplug) -> Result<Zone, 
 }
 
 // Convert the CSV DMR ID hashmap into a DMRId struct
-fn parse_dmr_id_record(csv_dmr_id: &CsvRecord) -> Result<DmrId, Box<dyn Error>> {
+fn parse_dmr_id_record(csv_dmr_id: &CsvRecord, opt: &Opt) -> Result<DmrId, Box<dyn Error>> {
+    dprintln!(opt.verbose, 4, "    {:?}", csv_dmr_id);
     let dmr_id = DmrId {
         id: csv_dmr_id.get("Radio ID").unwrap().parse::<u32>()?,
         name: csv_dmr_id.get("Name").unwrap().to_string(),
@@ -351,17 +356,22 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         None => return Err("Bad input path".into()),
     };
 
-    // Check for TalkGroups.CSV
+    // Check for TalkGroups.CSV, some CPS versions call this ContactTalkGroups.CSV
     let mut talkgroups_path: PathBuf = input_path.clone();
     talkgroups_path.push("TalkGroups.CSV");
-    // if TalkGroups.CSV doesn't exist, no problem, we just don't have any talkgroups
+    if !talkgroups_path.exists() {
+        // try the other name
+        talkgroups_path.pop();
+        talkgroups_path.push("ContactTalkGroups.CSV");
+    }
+    // if neither file exist, no problem, we just don't have any talkgroups
     if talkgroups_path.exists() {
         dprintln!(opt.verbose, 3, "Reading {}", talkgroups_path.display());
         let mut reader = csv::Reader::from_path(talkgroups_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to DmrTalkgroup struct
-            let talkgroup = parse_talkgroup_record(&record)?;
+            let talkgroup = parse_talkgroup_record(&record, &opt)?;
             // append to codeplug.talkgroups
             codeplug.talkgroups.push(talkgroup);
         }
@@ -371,13 +381,14 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     let mut talkgroup_lists_path: PathBuf = input_path.clone();
     talkgroup_lists_path.push("ReceiveGroupCallList.CSV");
     // if this file doesn't exist, no problem, we just don't have any talkgroup lists
-    if talkgroup_lists_path.exists() {
+    // also, no point in reading this if we don't have any talkgroups
+    if talkgroup_lists_path.exists() && !codeplug.talkgroups.is_empty() {
         dprintln!(opt.verbose, 3, "Reading {}", talkgroup_lists_path.display());
         let mut reader = csv::Reader::from_path(talkgroup_lists_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to DmrTalkgroupList struct
-            let talkgroup_list = parse_talkgroup_list_record(&record, &codeplug)?;
+            let talkgroup_list = parse_talkgroup_list_record(&record, &codeplug, &opt)?;
             // append to codeplug.talkgroup_lists
             codeplug.talkgroup_lists.push(talkgroup_list);
         }
@@ -394,7 +405,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to Channel struct
-            let channel = parse_channel_record(&record)?;
+            let channel = parse_channel_record(&record, &opt)?;
             // Anytone D878UV stores VFO A/B at 4001/4002, skip these
             if (channel.index == 4001 && channel.name == "Channel VFO A") ||
                (channel.index == 4002 && channel.name == "Channel VFO B") {
@@ -415,7 +426,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to Zone struct
-            let zone = parse_zone_record(&record, &codeplug)?;
+            let zone = parse_zone_record(&record, &codeplug, &opt)?;
             // append to codeplug.zones
             codeplug.zones.push(zone);
         }
@@ -427,11 +438,21 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     // if this file doesn't exist, no problem, we just don't set the radio ID list
     if radio_id_list_path.exists() {
         dprintln!(opt.verbose, 3, "Reading {}", radio_id_list_path.display());
-        let mut reader = csv::Reader::from_path(radio_id_list_path)?;
+        // Sometimes RadioIDList.CSV has an extra "Name" column in the header, so we need to do some dumb stuff to work around this
+        // read the file into a string
+        let radio_id_list_content = fs::read_to_string(radio_id_list_path)?;
+        // if the first line has two "Name" columns, remove the second one
+        let radio_id_list_content = radio_id_list_content.replace("\"Name\",\"Name\"", "\"Name\"");
+        let mut reader = csv::ReaderBuilder::new()
+            .flexible(true)
+            .has_headers(true)
+            .from_reader(radio_id_list_content.as_bytes());
         for result in reader.deserialize() {
+            cprintln!(ANSI_C_YLW, "{:?}", result);
             let record: CsvRecord = result?;
+            cprintln!(ANSI_C_YLW, "{:?}", record);
             // convert from CSV record to DmrId struct
-            let dmr_id = parse_dmr_id_record(&record)?;
+            let dmr_id = parse_dmr_id_record(&record, &opt)?;
             // append to codeplug.config.dmr_configuration.id_list
             if codeplug.config.is_none() {
                 codeplug.config = Some(Configuration {

@@ -42,8 +42,8 @@ pub fn validate_generic(codeplug: &structures::Codeplug, opt: &Opt) -> Result<()
                         let offset = tx_band.as_ref().unwrap().nominal_offset.unwrap();
                         let diff = (channel.frequency_tx - channel.frequency_rx).abs();
                         if diff != Decimal::new(0, 0) && diff != offset {
-                            cprintln!(ANSI_C_YLW, "Warning: Channel {} \"{}\" Nominal offset mismatch: {}",
-                                channel.index, channel.name, diff);
+                            cprintln!(ANSI_C_YLW, "Warning: Channel {:4} {:24} Nominal offset mismatch: {:8.3} kHz",
+                                channel.index, channel.name, (diff / Decimal::new(1_000, 0)).to_f64().unwrap());
                             warning_count += 1;
                         }
                     }
