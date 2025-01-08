@@ -1,4 +1,5 @@
 // src/helpers.rs
+use rust_decimal::prelude::ToPrimitive;
 
 // ANSI color codes
 pub const ANSI_C_RED: &str = "31";
@@ -6,7 +7,7 @@ pub const ANSI_C_GRN: &str = "32";
 pub const ANSI_C_YLW: &str = "33";
 // pub const ANSI_C_BLU: &str = "34";
 // pub const ANSI_C_MAG: &str = "35";
-// pub const ANSI_C_CYN: &str = "36";
+pub const ANSI_C_CYN: &str = "36";
 
 // debug print
 #[macro_export]
@@ -37,4 +38,19 @@ macro_rules! function {
         let name = type_name_of(f);
         name.strip_suffix("::f").unwrap()
     }}
+}
+
+// print a Decimal as a frequency
+pub fn freq2str(freq: &rust_decimal::Decimal) -> String {
+    let f = freq.to_f64().unwrap();
+    if f >= 10e9 {
+        return format!("{:7.3} GHz", f/1e9)
+    } else if f >= 10e6 {
+        return format!("{:7.3} MHz", f/1e6)
+    } else if f >= 10e3 {
+        return format!("{:7.3} kHz", f/1e3)
+    } else if f >= 1.0 {
+        return format!("{:7.3} Hz", f)
+    }
+    format!("{:.6}", f)
 }

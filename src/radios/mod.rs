@@ -1,6 +1,8 @@
 // src/radios/mod.rs
 
 use std::error::Error;
+use std::collections::HashMap;
+
 use crate::Opt;
 use crate::structures::Codeplug;
 use crate::*;
@@ -40,37 +42,38 @@ pub fn read_codeplug(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     }
 }
 
-fn print_supported_radios_write() {
-    eprintln!("Operation write supports the following radio models:");
-    eprintln!("    opengd77_rt3s - Retevis RT3S with OpenGD77 firmware");
-    //eprintln!("    chirp_generic - Generic CHIRP CSV")
-}
-
 pub fn write_codeplug(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    // validate the radio
+    // build up a hashmap of function pointers
+    let mut write_functions: HashMap<&str, fn(&Codeplug, &Opt) -> Result<(), Box<dyn Error>>>
+        = HashMap::new();
+    write_functions.insert("anytone_x78", anytone_x78::write);
+    write_functions.insert("opengd77_rt3s", opengd77_rt3s::write);
+    //write_functions.insert("chirp_generic", chirp_generic::write);
+
     if opt.radio.is_none() {
         cprintln!(ANSI_C_RED, "Radio model is required for operation: write");
         return Err("Bad radio model".into());
     }
-    let radio_model = opt.radio.as_ref().unwrap();
+
     // validate the output path
     if opt.output.is_none() {
         cprintln!(ANSI_C_RED, "Output path is required for operation: write");
         return Err("Bad output path".into());
     }
 
-    // search for the radio model in the supported radios
-    if "anytone_x78".contains(radio_model) {
-        return anytone_x78::write(codeplug, opt);
-    } else if "opengd77_rt3s".contains(radio_model) {
-        return opengd77_rt3s::write(codeplug, opt);
-    // } else if "chirp_generic".contains(radio_model) {
-    //     return chirp_generic::write(codeplug, opt);
+    // get the radio model
+    let radio_model = opt.radio.as_ref().unwrap();
+
+    if let Some(write_function) = write_functions.get(radio_model.as_str()) {
+        return write_function(codeplug, opt);
     } else {
         cprintln!(ANSI_C_RED, "Unsupported radio model for operation: write");
-        print_supported_radios_write();
-        return Err("Bad radio model".into())
+        cprintln!(ANSI_C_YLW, "Operation write supports the following radio models:");
+        for (radio_model, _) in write_functions.iter() {
+            cprintln!(ANSI_C_YLW, "    {}", radio_model);
+        }
+        return Err("Bad radio model".into());
     }
 }
 

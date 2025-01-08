@@ -52,8 +52,8 @@ fn get_props() -> &'static structures::RadioProperties {
 // - RX Tone: None, CTCSS frequency in Hz, or DCS code (DnnnN or DnnnI), blank for Digital
 // - TX Tone: None, CTCSS frequency in Hz, or DCS code (DnnnN or DnnnI), blank for Digital
 // - Squelch: blank for Digital, [Disabled,Open,Closed,5%..95%] (default is Disabled)
-// - Power: [Master,P1,P2,P3,P4,P5,P6,P7,P8,P9,-W+] corresponding to [default,50mW,250mW,500mW,750mW,1W,2W,3W,4W,5W,+W-]
-//   - OpenGD77 uses +W- for user configurable power which may be ~6W on the RT3S at max PA drive, but may also be lower than 50mW if configured
+// - Power: [Master,P1,P2,P3,P4,P5,P6,P7,P8,P9,-W+] corresponding to [default,50mW,250mW,500mW,750mW,1W,2W,3W,4W,5W,-W+]
+//   - OpenGD77 uses -W+ for user configurable power which may be ~6W on the RT3S at max PA drive, but may also be lower than 50mW if configured
 // - Rx Only: [No, Yes]
 // - Zone Skip: [No, Yes]
 // - All Skip: [No, Yes]
@@ -84,7 +84,8 @@ type CsvRecord = HashMap<String, String>;
 
 // READ ///////////////////////////////////////////////////////////////////////
 
-pub fn parse_talkgroup_record(record: &CsvRecord) -> Result<DmrTalkgroup, Box<dyn Error>> {
+pub fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup, Box<dyn Error>> {
+    dprintln!(opt.verbose, 4, "    {:?}", record);
     let talkgroup = DmrTalkgroup {
         id: record.get("ID").unwrap().parse()?,
         name: record.get("Contact Name").unwrap().to_string(),
@@ -98,7 +99,8 @@ pub fn parse_talkgroup_record(record: &CsvRecord) -> Result<DmrTalkgroup, Box<dy
     Ok(talkgroup)
 }
 
-pub fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug) -> Result<DmrTalkgroupList, Box<dyn Error>> {
+pub fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<DmrTalkgroupList, Box<dyn Error>> {
+    dprintln!(opt.verbose, 4, "    {:?}", record);
     let mut talkgroup_list = DmrTalkgroupList {
         name: record.get("TG List Name").unwrap().to_string(),
         talkgroups: Vec::new(),
@@ -118,6 +120,36 @@ pub fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug) -> R
         }
     }
     Ok(talkgroup_list)
+}
+
+// Convert a power string into a Power struct
+// OpenGD77 stores power as follows:
+// - "Master" for default power
+// - "P1".."P9" for power levels
+// - "-W+" for user configurable power
+fn parse_power(power: &str) -> Power {
+    if power == "Master" {
+        return Power {
+            default: true,
+            watts: None,
+        }
+    }
+    Power {
+        default: false,
+        watts: match power {
+            "P1" => Some(Decimal::new(50, 3)), // 50mW
+            "P2" => Some(Decimal::new(250, 3)), // 250mW
+            "P3" => Some(Decimal::new(500, 3)), // 500mW
+            "P4" => Some(Decimal::new(750, 3)), // 750mW
+            "P5" => Some(Decimal::new(1, 0)), // 1W
+            "P6" => Some(Decimal::new(2, 0)), // 2W
+            "P7" => Some(Decimal::new(3, 0)), // 3W
+            "P8" => Some(Decimal::new(4, 0)), // 4W
+            "P9" => Some(Decimal::new(5, 0)), // 5W
+            "-W+" => Some(Decimal::new(6, 0)), // @TODO user configurable power
+            _ => panic!("Unrecognized power level: {}", power),
+        },
+    }
 }
 
 // Convert a CTCSS/DCS string into a Tone struct
@@ -175,7 +207,8 @@ fn parse_squelch(squelch: &str) -> Squelch {
     }
 }
 
-pub fn parse_channel_record(record: &CsvRecord) -> Result<Channel, Box<dyn Error>> {
+pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
+    dprintln!(opt.verbose, 4, "    {:?}", record);
     let mut channel = Channel {
         index: 0,
         name: String::new(),
@@ -204,19 +237,7 @@ pub fn parse_channel_record(record: &CsvRecord) -> Result<Channel, Box<dyn Error
     if record.get("TOT").unwrap() != "0" {
         channel.tx_tot = Timeout {default: false, seconds: Some(record.get("TOT").unwrap().parse::<u32>()?)};
     }
-    channel.power = match record.get("Power").unwrap().as_str() {
-        "Master" => Power {default: true, watts: None},
-        "P1" => Power {default: false, watts: Some(Decimal::new(50,3))}, // 50mW
-        "P2" => Power {default: false, watts: Some(Decimal::new(250,3))}, // 250mW
-        "P3" => Power {default: false, watts: Some(Decimal::new(500,3))}, // 500mW
-        "P4" => Power {default: false, watts: Some(Decimal::new(750,3))}, // 750mW
-        "P5" => Power {default: false, watts: Some(Decimal::new(1,0))}, // 1W
-        "P6" => Power {default: false, watts: Some(Decimal::new(2,0))}, // 2W
-        "P7" => Power {default: false, watts: Some(Decimal::new(3,0))}, // 3W
-        "P8" => Power {default: false, watts: Some(Decimal::new(4,0))}, // 4W
-        "P9" => Power {default: false, watts: Some(Decimal::new(5,0))}, // 5W
-        _ => return Err(format!("Unrecognized power level: {}", record.get("Power").unwrap()).into()), // +W- not supported yet
-    };
+    channel.power = parse_power(record.get("Power").unwrap().as_str());
     if record.get("Zone Skip").unwrap() == "Yes" || record.get("All Skip").unwrap() == "Yes" {
         channel.scan = Some(Scan {
             zone_skip: record.get("Zone Skip").unwrap() == "Yes",
@@ -251,7 +272,8 @@ pub fn parse_channel_record(record: &CsvRecord) -> Result<Channel, Box<dyn Error
     Ok(channel)
 }
 
-pub fn parse_zone_record(record: &CsvRecord, codeplug: &Codeplug) -> Result<Zone, Box<dyn Error>> {
+pub fn parse_zone_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<Zone, Box<dyn Error>> {
+    dprintln!(opt.verbose, 4, "    {:?}", record);
     let mut zone = Zone {
         name: record.get("Zone Name").unwrap().to_string(),
         channels: Vec::new(),
@@ -309,7 +331,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to DmrTalkgroup struct
-            let talkgroup = parse_talkgroup_record(&record)?;
+            let talkgroup = parse_talkgroup_record(&record, &opt)?;
             // append to codeplug.talkgroups
             codeplug.talkgroups.push(talkgroup);
         }
@@ -319,13 +341,14 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     let mut talkgroup_lists_path: PathBuf = input_path.clone();
     talkgroup_lists_path.push("TG_Lists.csv");
     // if TG_Lists.csv doesn't exist, no problem, we just don't have any talkgroup lists
-    if talkgroup_lists_path.exists() {
+    // also, no point in reading this if we don't have any talkgroups
+    if talkgroup_lists_path.exists() && !codeplug.talkgroups.is_empty() {
         dprintln!(opt.verbose, 3, "Reading {}", talkgroup_lists_path.display());
         let mut reader = csv::Reader::from_path(talkgroup_lists_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to DmrTalkgroupList struct
-            let talkgroup_list = parse_talkgroup_list_record(&record, &codeplug)?;
+            let talkgroup_list = parse_talkgroup_list_record(&record, &codeplug, &opt)?;
             // append to codeplug.talkgroup_lists
             codeplug.talkgroup_lists.push(talkgroup_list);
         }
@@ -342,7 +365,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to Channel struct
-            let channel = parse_channel_record(&record)?;
+            let channel = parse_channel_record(&record, &opt)?;
             // append to codeplug.channels
             codeplug.channels.push(channel);
         }
@@ -358,7 +381,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to Zone struct
-            let zone = parse_zone_record(&record, &codeplug)?;
+            let zone = parse_zone_record(&record, &codeplug, &opt)?;
             // append to codeplug.zones
             codeplug.zones.push(zone);
         }

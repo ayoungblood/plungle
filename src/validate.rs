@@ -8,6 +8,7 @@ pub fn validate_generic(codeplug: &structures::Codeplug, opt: &Opt) -> Result<()
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
     let mut error_count: usize = 0;
     let mut warning_count: usize = 0;
+    let mut info_count: usize = 0;
     // validate the codeplug
     if codeplug.channels.is_empty() {
         cprintln!(ANSI_C_RED, "Codeplug has no channels");
@@ -15,56 +16,76 @@ pub fn validate_generic(codeplug: &structures::Codeplug, opt: &Opt) -> Result<()
     }
     for channel in &codeplug.channels {
         if channel.name.is_empty() {
-            cprintln!(ANSI_C_RED, "Error: Channel {} Name is empty", channel.index);
+            cprintln!(ANSI_C_RED, "Error:   Channel {:4} {:24} Name is empty", channel.index, channel.name);
             error_count += 1;
+        }
+        if channel.name.len() > 24 {
+            cprintln!(ANSI_C_YLW, "Warning: Channel {:4} {:24} Name is too long (len: {})", channel.index, channel.name, channel.name.len());
+            warning_count += 1;
         }
         let rx_band = get_band(channel.frequency_rx);
         let tx_band = get_band(channel.frequency_rx);
-        // make sure we have an RX band
+        // warn less strongly if we don't know the RX band
         if rx_band.is_none() {
-            cprintln!(ANSI_C_YLW, "Warning: Channel {} \"{}\" Unrecognized RX band: {}",
-                channel.index, channel.name, channel.frequency_rx);
+            cprintln!(ANSI_C_CYN, "Info:    Channel {:4} {:24} Unrecognized RX band: {}", channel.index, channel.name, freq2str(&channel.frequency_rx));
+            info_count += 1;
+        }
+        // warn if we don't know the TX band, but only if the channel is not RX only
+        if tx_band.is_none() && !channel.rx_only {
+            cprintln!(ANSI_C_YLW, "Warning: Channel {:4} {:24} Unrecognized TX band: {}", channel.index, channel.name, freq2str(&channel.frequency_tx));
             warning_count += 1;
-        } else { // we have an RX band
-            if tx_band.is_none() {
-                cprintln!(ANSI_C_YLW, "Warning: Channel {} \"{}\" Unrecognized TX band: {}",
-                    channel.index, channel.name, channel.frequency_tx);
+        }
+        // if we have both bands
+        if !rx_band.is_none() && !tx_band.is_none() {
+            // warn on crossband
+            if rx_band != tx_band {
+                cprintln!(ANSI_C_YLW, "Warning: Channel {:4} {:24} RX/TX band mismatch tx: {} rx: {}", channel.index, channel.name, freq2str(&channel.frequency_tx), freq2str(&channel.frequency_rx));
                 warning_count += 1;
-            }  else { // we have both RX and TX bands
-                // check for crossband
-                if rx_band != tx_band {
-                    cprintln!(ANSI_C_YLW, "Warning: Channel {} \"{}\" RX and TX band mismatch: RX {} TX {}",
-                        channel.index, channel.name, rx_band.as_ref().unwrap().name, tx_band.as_ref().unwrap().name);
-                    warning_count += 1;
-                } else {
-                    // not crossband, check for offset
-                    if !rx_band.as_ref().unwrap().nominal_offset.is_none() {
-                        let offset = tx_band.as_ref().unwrap().nominal_offset.unwrap();
-                        let diff = (channel.frequency_tx - channel.frequency_rx).abs();
-                        if diff != Decimal::new(0, 0) && diff != offset {
-                            cprintln!(ANSI_C_YLW, "Warning: Channel {:4} {:24} Nominal offset mismatch: {:8.3} kHz",
-                                channel.index, channel.name, (diff / Decimal::new(1_000, 0)).to_f64().unwrap());
-                            warning_count += 1;
-                        }
+            } else { // if not crossband, check the offset
+                // if we have a nominal offset, check if it matches the difference between RX and TX
+                let mut offset = Decimal::new(0, 0);
+                if rx_band.as_ref().unwrap().nominal_offset.is_some() {
+                    offset = rx_band.as_ref().unwrap().nominal_offset.unwrap();
+                }
+                if tx_band.as_ref().unwrap().nominal_offset.is_some() {
+                    offset = tx_band.as_ref().unwrap().nominal_offset.unwrap();
+                }
+                if offset != Decimal::new(0, 0) {
+                    let diff = (channel.frequency_tx - channel.frequency_rx).abs();
+                    if diff != Decimal::new(0, 0) && diff != offset {
+                        cprintln!(ANSI_C_YLW, "Warning: Channel {:4} {:24} Nominal offset mismatch: {} (tx: {} rx: {})", channel.index, channel.name, freq2str(&diff), freq2str(&channel.frequency_tx), freq2str(&channel.frequency_rx));
+                        warning_count += 1;
                     }
                 }
-
             }
-        }
-        // if we have a TX band, check if we're transmitting outside the amateur bands
-        if !tx_band.is_none() && !channel.rx_only {
-            if tx_band.as_ref().unwrap().is_amateur == false {
-                cprintln!(ANSI_C_YLW, "Warning: Channel {} \"{}\" TX outside amateur band: {}", channel.index, channel.name, channel.frequency_tx);
-                warning_count += 1;
+
+            // if we have a TX band, check if we're transmitting outside the amateur bands
+            if !tx_band.is_none() && !channel.rx_only {
+                if tx_band.as_ref().unwrap().is_amateur == false {
+                    // check if it's a known non-amateur band
+                    if tx_band.as_ref().unwrap().name == "MURS" {
+                        // warn less strongly about MURS
+                        cprintln!(ANSI_C_CYN, "Info:    Channel {:4} {:24} TX on MURS: {}", channel.index, channel.name, freq2str(&channel.frequency_tx));
+                        info_count += 1;
+                    } else if tx_band.as_ref().unwrap().name == "FRS/GMRS" {
+                        // warn less strongly about FRS/GMRS
+                        cprintln!(ANSI_C_CYN, "Info:    Channel {:4} {:24} TX on FRS/GMRS: {}", channel.index, channel.name, freq2str(&channel.frequency_tx));
+                        info_count += 1;
+                    } else {
+                        cprintln!(ANSI_C_YLW, "Warning: Channel {:4} {:24} TX outside amateur band: {}", channel.index, channel.name, freq2str(&channel.frequency_tx));
+                        warning_count += 1;
+                    }
+                }
             }
         }
     }
+    eprintln!("");
     if error_count > 0 {
-        cprintln!(ANSI_C_RED, "Generic validation: {} errors, {} warnings", error_count, warning_count);
-    } else if warning_count > 0{
-        cprintln!(ANSI_C_YLW, "Generic validation: {} errors, {} warnings", error_count, warning_count);
+        cprintln!(ANSI_C_RED, "Generic validation: {} infos, {} errors, {} warnings", info_count, error_count, warning_count);
+    } else if warning_count > 0 {
+        cprintln!(ANSI_C_YLW, "Generic validation: {} infos, {} errors, {} warnings", info_count, error_count, warning_count);
     } else {
-        cprintln!(ANSI_C_GRN, "Generic validation: {} errors, {} warnings", error_count, warning_count);
+        cprintln!(ANSI_C_GRN, "Generic validation: {} infos, {} errors, {} warnings", info_count, error_count, warning_count);
     }
     Ok(())
 }
@@ -201,8 +222,8 @@ fn get_bands() -> Vec<Band> {
     });
     bands.push(Band {
         name: "FRS/GMRS".to_string(),
-        freq_min: Decimal::from_str("462.5625").unwrap() * Decimal::new(1_000_000, 0), // 462.5625 MHz
-        freq_max: Decimal::from_str("467.7250").unwrap() * Decimal::new(1_000_000, 0), // 467.7250 MHz
+        freq_min: Decimal::from_str("462.550").unwrap() * Decimal::new(1_000_000, 0), // 462.5625 MHz
+        freq_max: Decimal::from_str("467.725").unwrap() * Decimal::new(1_000_000, 0), // 467.7250 MHz
         is_amateur: false,
         nominal_offset: Some(Decimal::from_str("5.0").unwrap() * Decimal::new(1_000_000, 0)), // 5.0 MHz
     });
