@@ -21,7 +21,7 @@ jobs:
                       os: windows-latest
                       archive: zip
         steps:
-            - uses: actions/checkout@v4with
+            - uses: actions/checkout@v4
             - name: Compile
               uses: rust-build/rust-build-action@master
               with:
