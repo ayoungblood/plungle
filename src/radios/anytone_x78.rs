@@ -140,7 +140,7 @@ fn get_props() -> &'static structures::RadioProperties {
 // - Look Back Time A[s]: default 2
 // - Look Back Time B[s]: default 3
 // - Dropout Delay Time[s]: default 3.1
-// - Priority Sample Time[s]: default 3.1
+// - Dwell Time[s]: default 3.1
 
 // TalkGroups.CSV
 // - No.: DMR talkgroup index
@@ -448,9 +448,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
             .has_headers(true)
             .from_reader(radio_id_list_content.as_bytes());
         for result in reader.deserialize() {
-            cprintln!(ANSI_C_YLW, "{:?}", result);
             let record: CsvRecord = result?;
-            cprintln!(ANSI_C_YLW, "{:?}", record);
             // convert from CSV record to DmrId struct
             let dmr_id = parse_dmr_id_record(&record, &opt)?;
             // append to codeplug.config.dmr_configuration.id_list
@@ -568,6 +566,34 @@ fn write_power(power: &Power) -> String {
     }
 }
 
+// Anytone always needs both a talkgroup and a talkgroup list
+fn write_contact(channel: &Channel, codeplug: &Codeplug) -> String {
+    if channel.dmr.as_ref().unwrap().talkgroup.is_some() {
+        return channel.dmr.as_ref().unwrap().talkgroup.as_ref().unwrap().to_string();
+    } else {
+        // pick the first contact in the talkgroup list
+        if let Some(talkgroup_list) = &channel.dmr.as_ref().unwrap().talkgroup_list {
+            if let Some(talkgroup) = codeplug.talkgroup_lists.iter().find(|&t| t.name == *talkgroup_list) {
+                return talkgroup.talkgroups[0].id.to_string();
+            }
+        }
+    }
+    // if all else fails, return an empty string
+    "".to_string()
+}
+
+// scan list needs to be set in the channel
+// right now, we build the scan list from the zone
+// so just pick the first zone that contains the channel, and set that as the scan list (if it exists)
+fn write_scan_list(channel: &Channel, codeplug: &Codeplug) -> String {
+    for zone in &codeplug.zones {
+        if zone.channels.contains(&channel.name) {
+            return zone.name.clone();
+        }
+    }
+    "".to_string()
+}
+
 pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
     dprintln!(opt.verbose, 1, "Writing {}", path.display());
@@ -638,6 +664,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
 
     for channel in &codeplug.channels {
         dprintln!(opt.verbose, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width = get_props().channel_index_width);
+        dprintln!(opt.verbose, 4, "    {:?}", channel);
         if channel.mode == ChannelMode::FM {
             writer.write_record(&[
                 channel.index.to_string(), // No.
@@ -678,9 +705,9 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 "1".to_string(), // 2Tone ID
                 "1".to_string(), // 5Tone ID
                 "Off".to_string(), // PTT ID
-                "".to_string(), // Color Code
+                "0".to_string(), // Color Code (this has to be set on analog channels or the CPS will refuse to import)
                 "".to_string(), // Slot
-                "".to_string(), // Scan List
+                write_scan_list(&channel, &codeplug), // Scan List
                 "".to_string(), // Receive Group List
                 if channel.rx_only { "On" } else { "Off" }.to_string(), // PTT Prohibit
                 "Off".to_string(), // Reverse
@@ -725,7 +752,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 "".to_string(), // Band Width
                 "".to_string(), // CTCSS/DCS Decode
                 "".to_string(), // CTCSS/DCS Encode
-                channel.dmr.as_ref().unwrap().talkgroup.as_ref().unwrap().to_string(), // Contact
+                write_contact(&channel, &codeplug), // Contact
                 "Group Call".to_string(), // Contact Call Type
                 "".to_string(), // Contact TG/DMR ID
                 "".to_string(), // Radio ID
@@ -738,8 +765,12 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 "Off".to_string(), // PTT ID
                 channel.dmr.as_ref().unwrap().color_code.to_string(), // Color Code
                 channel.dmr.as_ref().unwrap().timeslot.to_string(), // Slot
-                "".to_string(), // Scan List
-                "".to_string(), // Receive Group List
+                write_scan_list(&channel, &codeplug), // Scan List
+                if channel.dmr.as_ref().unwrap().talkgroup_list.is_some() {
+                    channel.dmr.as_ref().unwrap().talkgroup_list.as_ref().unwrap().to_string()
+                } else {
+                    "".to_string()
+                } , // Receive Group List
                 if channel.rx_only { "On" } else { "Off" }.to_string(), // PTT Prohibit
                 "Off".to_string(), // Reverse
                 "Off".to_string(), // Simplex TDMA
@@ -847,6 +878,82 @@ pub fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(),
     Ok(())
 }
 
+pub fn write_scanlists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+
+    let mut writer = csv::WriterBuilder::new()
+        .quote_style(csv::QuoteStyle::Always) // Anytone CPS expects all fields to be quoted
+        .terminator(csv::Terminator::CRLF)
+        .from_path(path)?;
+
+    // write the header
+    writer.write_record(&[
+        "No.",
+        "Scan List Name",
+        "Scan Channel Member",
+        "Scan Channel Member RX Frequency",
+        "Scan Channel Member TX Frequency",
+        "Scan Mode",
+        "Priority Channel Select",
+        "Priority Channel 1",
+        "Priority Channel 1 RX Frequency",
+        "Priority Channel 1 TX Frequency",
+        "Priority Channel 2",
+        "Priority Channel 2 RX Frequency",
+        "Priority Channel 2 TX Frequency",
+        "Revert Channel",
+        "Look Back Time A[s]",
+        "Look Back Time B[s]",
+        "Dropout Delay Time[s]",
+        "Dwell Time[s]",
+    ])?;
+
+    for (ii, zone) in codeplug.zones.iter().enumerate() {
+        dprintln!(opt.verbose, 4, "Writing scan list {:width$}: {}", ii + 1, zone.name, width = 3);
+        let mut channel_names = String::new();
+        let mut channel_rx_frequencies = String::new();
+        let mut channel_tx_frequencies = String::new();
+        // a scan list can only have 50 or fewer channels
+        for (jj, name) in zone.channels.iter().take(50).enumerate() {
+            if jj > 0 {
+                channel_names.push_str("|");
+                channel_rx_frequencies.push_str("|");
+                channel_tx_frequencies.push_str("|");
+            }
+            let channel = codeplug.channels.iter().find(|&c| c.name == *name).unwrap();
+            channel_names.push_str(&channel.name);
+            channel_rx_frequencies.push_str(&format!("{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()));
+            channel_tx_frequencies.push_str(&format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()));
+        }
+
+        writer.write_record(&[
+            format!("{}", ii + 1), // No.
+            zone.name.clone(), // Scan List Name
+            channel_names, // Scan Channel Member
+            channel_rx_frequencies, // Scan Channel Member RX Frequency
+            channel_tx_frequencies, // Scan Channel Member TX Frequency
+            "Off".to_string(), // Scan Mode
+            "Off".to_string(), // Priority Channel Select
+            "Off".to_string(), // Priority Channel 1
+            "".to_string(), // Priority Channel 1 RX Frequency
+            "".to_string(), // Priority Channel 1 TX Frequency
+            "Off".to_string(), // Priority Channel 2
+            "".to_string(), // Priority Channel 2 RX Frequency
+            "".to_string(), // Priority Channel 2 TX Frequency
+            "Selected".to_string(), // Revert Channel
+            "2".to_string(), // Look Back Time A[s]
+            "3".to_string(), // Look Back Time B[s]
+            "3.1".to_string(), // Dropout Delay Time[s]
+            "3.1".to_string(), // Priority Sample Time[s]
+        ])?;
+    }
+
+    writer.flush()?;
+    Ok(())
+}
+
+
 pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
     dprintln!(opt.verbose, 4, "{:?}", get_props());
@@ -897,6 +1004,14 @@ pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
     zones_path.push(if opt.excel { "Zone2.CSV" } else { "Zone.CSV" });
     if codeplug.zones.len() > 0 {
         write_zones(codeplug, &zones_path, opt)?;
+    }
+
+    // write to ScanList.CSV
+    // Copy zones to scan lists since we don't support scan lists yet @TODO
+    let mut scanlists_path: PathBuf = opt.output.clone().unwrap();
+    scanlists_path.push(if opt.excel { "ScanList2.CSV" } else { "ScanList.CSV" });
+    if codeplug.zones.len() > 0 {
+        write_scanlists(codeplug, &scanlists_path, opt)?;
     }
 
     Ok(())
