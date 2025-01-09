@@ -43,14 +43,14 @@ macro_rules! function {
 // print a Decimal as a frequency
 pub fn freq2str(freq: &rust_decimal::Decimal) -> String {
     let f = freq.to_f64().unwrap();
-    if f >= 10e9 {
-        return format!("{:7.3} GHz", f/1e9)
-    } else if f >= 10e6 {
-        return format!("{:7.3} MHz", f/1e6)
-    } else if f >= 10e3 {
-        return format!("{:7.3} kHz", f/1e3)
+    if f >= 1e9 {
+        return format!("{:8.4} GHz", f/1e9)
+    } else if f >= 1e6 {
+        return format!("{:8.4} MHz", f/1e6)
+    } else if f >= 1e3 {
+        return format!("{:8.4} kHz", f/1e3)
     } else if f >= 1.0 {
-        return format!("{:7.3} Hz", f)
+        return format!("{:8.4} Hz", f)
     }
     format!("{:.6}", f)
 }
