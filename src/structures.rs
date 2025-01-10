@@ -3,8 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 /// Channel mode
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
 pub enum ChannelMode {
+    #[default]
     AM,
     FM,
     DMR,
@@ -51,14 +52,14 @@ pub struct DmrChannel {
 }
 
 /// Timeout
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
 pub struct Timeout {
     pub default: bool,
     pub seconds: Option<u32>,
 }
 
 /// Power
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
 pub struct Power {
     pub default: bool,
     pub watts: Option<rust_decimal::Decimal>,
@@ -72,7 +73,7 @@ pub struct Scan {
 }
 
 /// Channel
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
 pub struct Channel {
     pub index: u32,
     pub name: String,
