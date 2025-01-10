@@ -10,7 +10,7 @@ use crate::validate::validate_generic;
 
 mod anytone_x78;
 mod opengd77_rt3s;
-// mod chirp_generic;
+mod chirp_generic;
 
 pub fn read_codeplug(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
@@ -19,7 +19,7 @@ pub fn read_codeplug(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
         = HashMap::new();
     read_functions.insert("anytone_x78", anytone_x78::read);
     read_functions.insert("opengd77_rt3s", opengd77_rt3s::read);
-    //read_functions.insert("chirp_generic", chirp_generic::read);
+    read_functions.insert("chirp_generic", chirp_generic::read);
 
     if opt.radio.is_none() {
         cprintln!(ANSI_C_RED, "Radio model is required for operation: read");
