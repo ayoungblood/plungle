@@ -24,7 +24,7 @@ pub fn validate_generic(codeplug: &structures::Codeplug, opt: &Opt) -> Result<()
             warning_count += 1;
         }
         let rx_band = get_band(channel.frequency_rx);
-        let tx_band = get_band(channel.frequency_rx);
+        let tx_band = get_band(channel.frequency_tx);
         // warn less strongly if we don't know the RX band
         if rx_band.is_none() {
             cprintln!(ANSI_C_CYN, "Info:    Channel {:4} {:24} Unrecognized RX band: {}", channel.index, channel.name, freq2str(&channel.frequency_rx));
@@ -81,11 +81,11 @@ pub fn validate_generic(codeplug: &structures::Codeplug, opt: &Opt) -> Result<()
     }
     eprintln!("");
     if error_count > 0 {
-        cprintln!(ANSI_C_RED, "Generic validation: {} infos, {} errors, {} warnings", info_count, error_count, warning_count);
+        cprintln!(ANSI_C_RED, "Generic validation: {} errors, {} warnings, {} infos", error_count, warning_count, info_count);
     } else if warning_count > 0 {
-        cprintln!(ANSI_C_YLW, "Generic validation: {} infos, {} errors, {} warnings", info_count, error_count, warning_count);
+        cprintln!(ANSI_C_YLW, "Generic validation: {} errors, {} warnings, {} infos", error_count, warning_count, info_count);
     } else {
-        cprintln!(ANSI_C_GRN, "Generic validation: {} infos, {} errors, {} warnings", info_count, error_count, warning_count);
+        cprintln!(ANSI_C_GRN, "Generic validation: {} errors, {} warnings, {} infos", error_count, warning_count, info_count);
     }
     Ok(())
 }

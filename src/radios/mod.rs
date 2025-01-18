@@ -53,7 +53,7 @@ pub fn write_codeplug(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Erro
         = HashMap::new();
     write_functions.insert("anytone_x78", anytone_x78::write);
     write_functions.insert("opengd77_rt3s", opengd77_rt3s::write);
-    //write_functions.insert("chirp_generic", chirp_generic::write);
+    write_functions.insert("chirp_generic", chirp_generic::write);
 
     if opt.radio.is_none() {
         cprintln!(ANSI_C_RED, "Radio model is required for operation: write");

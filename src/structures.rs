@@ -83,9 +83,10 @@ pub struct Channel {
     pub rx_only: bool,
     pub tx_tot: Timeout,
     pub power: Power,
+    pub scan: Option<Scan>,
+    // mode-specific properties
     pub fm: Option<FmChannel>,
     pub dmr: Option<DmrChannel>,
-    pub scan: Option<Scan>,
 }
 
 /// Zone (a zone is a collection of channels)
