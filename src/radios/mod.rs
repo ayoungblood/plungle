@@ -11,6 +11,7 @@ use crate::validate::validate_generic;
 mod anytone_x78;
 mod opengd77_rt3s;
 // mod chirp_generic;
+mod ailunce_hd1;
 
 pub fn read_codeplug(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
@@ -20,6 +21,7 @@ pub fn read_codeplug(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     read_functions.insert("anytone_x78", anytone_x78::read);
     read_functions.insert("opengd77_rt3s", opengd77_rt3s::read);
     //read_functions.insert("chirp_generic", chirp_generic::read);
+    read_functions.insert("ailunce_hd1", ailunce_hd1::read);
 
     if opt.radio.is_none() {
         cprintln!(ANSI_C_RED, "Radio model is required for operation: read");
@@ -54,6 +56,7 @@ pub fn write_codeplug(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Erro
     write_functions.insert("anytone_x78", anytone_x78::write);
     write_functions.insert("opengd77_rt3s", opengd77_rt3s::write);
     //write_functions.insert("chirp_generic", chirp_generic::write);
+    write_functions.insert("ailunce_hd1", ailunce_hd1::write);
 
     if opt.radio.is_none() {
         cprintln!(ANSI_C_RED, "Radio model is required for operation: write");

@@ -1,0 +1,8 @@
+No.,Call Type,Contacts Alias,City,Province,Country,Call ID,
+1,All Call,ALLCALL,,,,,
+2,Private Call,PRICALL,,,,12345678,
+3,Group Call,LOCAL 2,,,,2,
+4,Group Call,LOCAL 9,,,,9,
+5,Group Call,BM Global,,,,93,
+6,Group Call,BM Disconnect,,,,4000,
+7,Group Call,BM US TAC 310,,,,310,
