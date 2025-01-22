@@ -1,44 +1,72 @@
 # .github/workflows/build.yml
+# Based on https://github.com/open-contracting/cardinal-rs/blob/main/.github/workflows/release.yml
 
 name: Build and Release
-
 on:
     pull_request:
     push:
         branches:
-        - main
         - gh-actions
 
-env:
-    # Disable incremental compilation for faster from-scratch builds
-    CARGO_INCREMENTAL: 0
-    CRATE_NAME: plungle
-    RUST_BACKTRACE: 1
-
 jobs:
-    build:
-        name: release ${{ matrix.target }}
-        runs-on: ubuntu-latest
-        strategy:
-            fail-fast: false
-            matrix:
-                platform:
-                    - os-name: Linux-x86_64
-                      runs-on: ubuntu-24.04
-                      target: x86_64-unknown-linux-musl
-                    - os-name: Windows-aarch64
-                      runs-on: windows-latest
-                      target: aarch64-pc-windows-msvc
-                      skip-tests: true
-                toolchain:
-                    - stable
-
-        steps:
-            - uses: actions/checkout@v4
-            - name: Build binary
-              uses: houseabsolute/actions-rust-cross@v1
-              with:
-                command: "build"
-                target: ${{ matrix.platform.target }}
-                toolchain: ${{ matrix.toolchain }}
-              
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create ${{ github.ref_name }}
+  assets:
+    needs: release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # 32-bit (i686)
+          - build: linux-32-bit
+            os: ubuntu-latest
+            target: i686-unknown-linux-gnu
+            command: cross
+          - build: windows-32-bit
+            os: ubuntu-latest
+            target: i686-pc-windows-gnu
+            command: cross
+          # 64-bit (x86)
+          - build: linux-64-bit
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            command: cross
+          - build: macos-64-bit
+            os: macos-latest
+            target: x86_64-apple-darwin
+            command: cargo
+          - build: windows-64-bit
+            os: ubuntu-latest
+            target: x86_64-pc-windows-gnu
+            command: cross
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.target }}
+      - run: cargo install cross --git https://github.com/cross-rs/cross
+      - env:
+          RUSTFLAGS: -Zon-broken-pipe=kill
+        run: ${{ matrix.command }} build --release --target ${{ matrix.target }}
+      - name: Create archive
+        id: archive
+        shell: bash
+        run: |
+          DIRECTORY="plungle-${{ github.ref_name }}-${{ matrix.build }}"
+          if [[ "${{ matrix.target }}" =~ "-pc-windows-" ]]; then
+            SUFFIX=".exe"
+          else
+            SUFFIX=""
+          fi
+          mkdir "$DIRECTORY"
+          cp LICENSE README.md "target/${{ matrix.target }}/release/plungle$SUFFIX" "$DIRECTORY"
+          7z a "$DIRECTORY.zip" "$DIRECTORY"
+          echo "path=$DIRECTORY.zip" >> $GITHUB_OUTPUT
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload ${{ github.ref_name }} ${{ steps.archive.outputs.path }}
