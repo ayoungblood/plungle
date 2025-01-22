@@ -64,7 +64,7 @@ jobs:
             SUFFIX=""
           fi
           mkdir "$DIRECTORY"
-          cp LICENSE README.md "target/${{ matrix.target }}/release/plungle$SUFFIX" "$DIRECTORY"
+          cp LICENSE "target/${{ matrix.target }}/release/plungle$SUFFIX" "$DIRECTORY"
           7z a "$DIRECTORY.zip" "$DIRECTORY"
           echo "path=$DIRECTORY.zip" >> $GITHUB_OUTPUT
       - env:
