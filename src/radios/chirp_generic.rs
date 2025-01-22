@@ -284,7 +284,7 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
 }
 
 pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
-    dprintln!(opt.verbose, 4, "{:?}", record);
+    uprintln!(opt, Stderr, None, 4, "    {:?}", record);
 
     let mut channel = Channel::default();
 
@@ -340,14 +340,14 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
             tone_tx: tone_tx,
         });
     } else {
-        cprintln!(ANSI_C_RED, "Unsupported mode: {}", record.get("Mode").unwrap());
+        uprintln!(opt, Stderr, Color::Red, None, "Unsupported mode: {}", record.get("Mode").unwrap());
     }
     Ok(channel)
 }
 
-pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 4, "{:?}", get_props());
+pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let mut codeplug = Codeplug {
         channels: Vec::new(),
@@ -359,19 +359,12 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     };
 
     // check that the input path is a file
-    let input_path = match &opt.input {
-        Some(path) => {
-            if path.is_file() {
-                path
-            } else {
-                cprintln!(ANSI_C_RED, "You lied to me when you told me this was a file: {}", path.display());
-                return Err("Bad input path".into());
-            }
-        }
-        None => return Err("Bad input path".into()),
-    };
+    if !input_path.is_file() {
+        uprintln!(opt, Stderr, Color::Red, None, "You lied to me when you told me this was a file: {}", input_path.display());
+        return Err("Bad input path".into());
+    }
 
-    dprintln!(opt.verbose, 3, "Reading from: {}", input_path.display());
+    uprintln!(opt, Stderr, None, 3, "Reading {}", input_path.display());
     let mut reader = csv::Reader::from_path(input_path)?;
     for result in reader.deserialize() {
         let record: CsvRecord = result?;
@@ -515,8 +508,8 @@ fn write_mode(channel: &Channel) -> Result<String, Box<dyn Error>> {
 }
 
 fn write_channels(codeplug: &Codeplug, path: &Path, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     // open the output file
     let mut writer = csv::WriterBuilder::new()
@@ -548,7 +541,7 @@ fn write_channels(codeplug: &Codeplug, path: &Path, opt: &Opt) -> Result<(), Box
     ])?;
 
     for channel in &codeplug.channels {
-        dprintln!(opt.verbose, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width=get_props().channel_index_width);
+        uprintln!(opt, Stderr, None, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width=get_props().channel_index_width);
         if channel.mode == ChannelMode::FM {
             let (frequency, duplex, offset) = write_frequencies(channel);
             let (tone, r_tone_freq, c_tone_freq, dtcs_code, dtcs_polarity, rx_dtcs_code, cross_mode) = write_tones(channel);
@@ -579,7 +572,7 @@ fn write_channels(codeplug: &Codeplug, path: &Path, opt: &Opt) -> Result<(), Box
                 "".to_string(), // DVCODE
             ])?;
         } else {
-            cprintln!(ANSI_C_YLW, "Unsupported mode: index = {}, mode = {:?}", channel.index, channel.mode);
+            uprintln!(opt, Stderr, Color::Red, None, "Unsupported mode: index = {}, mode = {:?}", channel.index, channel.mode);
         }
     }
 
@@ -588,20 +581,18 @@ fn write_channels(codeplug: &Codeplug, path: &Path, opt: &Opt) -> Result<(), Box
 }
 
 
-pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 4, "{:?}", get_props());
+pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     // if the output path exists, complain
-    if let Some(path) = &opt.output {
-        if path.exists() {
-            cprintln!(ANSI_C_RED, "Output path already exists: {}", path.display());
-            return Err("Output path already exists".into());
-        }
+    if output_path.exists() {
+        uprintln!(opt, Stderr, Color::Red, None, "Output path already exists: {}", output_path.display());
+        return Err("Output path already exists".into());
     }
 
     // write channels
-    let channels_path: PathBuf = opt.output.as_ref().unwrap().clone();
+    let channels_path: PathBuf = output_path.clone();
     write_channels(&codeplug, &channels_path, &opt)?;
 
     Ok(())

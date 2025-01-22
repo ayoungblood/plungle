@@ -1,148 +1,180 @@
 // src/main.rs
+// plungle - Radio codeplug conversion tool
+// Author: Akira Youngblood 2024
 
+use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 use std::error::Error;
-use structopt::StructOpt;
 use helpers::*;
+use std::io::Write;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+use crate::Dest::{Stdout, Stderr};
 
 mod helpers;
 mod radios;
 mod structures;
 mod validate;
+mod bandplan;
 
-// plungle - Radio codeplug conversion tool
-// Usage: plungle [options] <operation> [<args>]
-// Author: Akira Youngblood 2024
-#[derive(StructOpt, Debug)]
-#[structopt(name = "plungle", about = "Radio codeplug conversion tool")]
+#[derive(Debug, Parser)]
+#[clap(version, author, about = "Codeplug conversion tool")]
 struct Opt {
-    /// Operation
-    #[structopt(name = "operation", required = true)]
-    operation: String,
-
-    /// Radio model
-    #[structopt(name = "radio")]
-    radio: Option<String>,
-
-    /// Input path
-    #[structopt(name = "input", parse(from_os_str))]
-    input: Option<std::path::PathBuf>,
-
-    /// Output path
-    #[structopt(name = "output", parse(from_os_str))]
-    output: Option<std::path::PathBuf>,
-
-    /// Dump
-    #[structopt(short, long)]
-    dump: Option<String>,
-
     /// Verbose mode (-v, -vv, -vvv)
-    #[structopt(short, long, parse(from_occurrences))]
+    #[arg(short, long, action = clap::ArgAction::Count, global=true)]
     verbose: u8,
 
-    /// Excel mode
-    #[structopt(long)]
-    excel: bool,
+    /// Color output
+    #[arg(short, long, default_value_t, value_enum, global=true)]
+    color: clap::ColorChoice,
+
+    /// Intermediary format
+    #[arg(short = 'F', long, default_value_t, value_enum, global=true)]
+    format: helpers::Format,
+
+    /// Filter
+    #[arg(short, long, global=true)]
+    filter: Option<String>,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
 }
 
-fn dump(codeplug: &structures::Codeplug, opt: &Opt) -> Result<structures::Codeplug, Box<dyn Error>> {
-    let mut new_codeplug = structures::Codeplug {
-        channels: Vec::new(),
-        zones: Vec::new(),
-        talkgroups: Vec::new(),
-        talkgroup_lists: Vec::new(),
-        config: None,
-        source: "".to_string(),
-    };
-    // we are dumping everything
-    if opt.dump.is_none() || opt.dump.as_ref().unwrap() == "all" {
-        new_codeplug = codeplug.clone();
-    } else {
-        let dump = opt.dump.as_ref().unwrap();
-        // split dump string into a vector
-        let dump_vec: Vec<&str> = dump.split(',').collect();
-        for dd in dump_vec {
-            dprintln!(opt.verbose, 3, "Processing dump item: {}", dd);
-            // if a dump argument starts with c, it applies to channels
-            if dd.starts_with("c") { // channels
-                if dd.contains("-") {
-                    let range: Vec<&str> = dd.trim_start_matches('c').split('-').collect();
-                    let start = range[0].parse::<usize>().unwrap();
-                    let end = range[1].parse::<usize>().unwrap();
-                    dprintln!(opt.verbose, 3, "Dump range: {}-{}", start, end);
-                    for ii in start..=end {
-                        // add channel by index to new codeplug
-                        for cc in codeplug.channels.iter() {
-                            if cc.index == ii as u32 {
-                                new_codeplug.channels.push(cc.clone());
-                            }
-                        }
-                    }
+#[derive(Debug, Subcommand)]
+#[command(arg_required_else_help = true)]
+enum Commands {
+    /// Parse radio-specific codeplug into an intermediary format
+    Parse {
+        /// Radio model
+        model: String,
+        /// Input path
+        input: PathBuf,
+        /// Output path (stdout is used if not specified)
+        output: Option<PathBuf>,
+    },
+    /// Generate a radio-specific codeplug from an intermediary format
+    Generate {
+        /// Radio model
+        model: String,
+        /// Input path
+        input: PathBuf,
+        /// Output path
+        output: PathBuf,
+    },
+    /// Merge codeplugs
+    Merge {
+        /// Input paths
+        inputs: Vec<PathBuf>,
+    },
+}
 
-                } else {
-                    let index = dd.trim_start_matches("c").parse::<usize>().unwrap();
-                    dprintln!(opt.verbose, 3, "Dump index: {}", index);
-                    // add channel by index to new codeplug
-                    for cc in codeplug.channels.iter() {
-                        if cc.index == index as u32 {
-                            new_codeplug.channels.push(cc.clone());
-                        }
-                    }
-                }
-            } else {
-                cprintln!(ANSI_C_YLW, "Unsupported dump item: {}", dd);
+// @TODO re-implement filtering and move to a separate module
+fn filter_codeplug(codeplug: &structures::Codeplug, _opt: &Opt) -> Result<structures::Codeplug, Box<dyn Error>> {
+    return Ok(codeplug.clone());
+}
+
+fn read_codeplug(input_path: &PathBuf, opt: &Opt) -> Result<structures::Codeplug, Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    // if we recognize the file extension, use it to determine the file format
+    // otherwise, use --format (which defaults to JSON)
+    let format = match input_path.extension() {
+        Some(ext) => {
+            match ext.to_str().unwrap() {
+                "json" => helpers::Format::Json,
+                "toml" => helpers::Format::Toml,
+                _ => opt.format.clone(),
             }
         }
+        None => opt.format.clone(),
+    };
+    // read the codeplug
+    let codeplug: structures::Codeplug;
+    if format == helpers::Format::Json {
+        uprintln!(opt, Stderr, Color::Green, None, "Reading codeplug as JSON from: {:?}", input_path);
+        codeplug = serde_json::from_str(&std::fs::read_to_string(input_path)?)?;
+    } else if format == helpers::Format::Toml {
+        uprintln!(opt, Stderr, Color::Green, None, "Reading codeplug as TOML from: {:?}", input_path);
+        codeplug = toml::from_str(&std::fs::read_to_string(input_path)?)?;
+    } else {
+        uprintln!(opt, Stderr, Color::Red, None, "Unsupported codeplug format");
+        return Err("Unsupported codeplug format".into());
     }
-    // dump to JSON (@TODO add support for YAML/TOML)
-    let json = serde_json::to_string_pretty(&new_codeplug)?;
-    println!("{}", json);
-    eprintln!("Codeplug has {} channels, {} zones, {} talkgroups, {} talkgroup lists",
-        new_codeplug.channels.len(), new_codeplug.zones.len(), new_codeplug.talkgroups.len(), new_codeplug.talkgroup_lists.len());
-    return Ok(new_codeplug);
-}
 
-fn load(opt: &Opt) -> Result<structures::Codeplug, Box<dyn Error>> {
-    // validate the input path
-    if opt.input.is_none() {
-        cprintln!(ANSI_C_RED, "Input path is required");
-        return Err("Bad input path".into());
-    }
-    let input_path = opt.input.as_ref().unwrap();
-    dprintln!(opt.verbose, 3, "Input path: {:?}", input_path);
-    // read the file and deserialize the codeplug
-    let codeplug: structures::Codeplug = serde_json::from_str(&std::fs::read_to_string(input_path)?)?;
     Ok(codeplug)
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let opt = Opt::from_args();
+fn write_codeplug(output_path: &Option<PathBuf>, codeplug: &structures::Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    // if we recognize the file extension, use it to determine the file format
+    // otherwise, use --format (which defaults to JSON)
+    let format = match output_path {
+        Some(path) => {
+            match path.extension() {
+                Some(ext) => {
+                    match ext.to_str().unwrap() {
+                        "json" => helpers::Format::Json,
+                        "toml" => helpers::Format::Toml,
+                        _ => opt.format.clone(),
+                    }
+                }
+                None => opt.format.clone(),
+            }
+        }
+        None => opt.format.clone(),
+    };
+    // serialize the codeplug to a string
+    let file_str = match format {
+        helpers::Format::Json => serde_json::to_string_pretty(codeplug)?,
+        helpers::Format::Toml => toml::to_string_pretty(codeplug)?,
+    };
 
-    // all output except the actual codeplug data should go to stderr
-    dprintln!(opt.verbose, 1, "Welcome to the plungle, we got fun and games!");
-    dprintln!(opt.verbose, 3, "{:?}", opt);
-
-    // parse the operation
-    if opt.operation == "read" || opt.operation == "r" {
-        // read() validates the radio model and input path
-        let codeplug = radios::read_codeplug(&opt)?;
-        // dump codeplug
-        dump(&codeplug, &opt)?;
-        // validate codeplug
-        radios::validate_codeplug(&codeplug, &opt)?;
-    } else if opt.operation == "write" || opt.operation == "w" {
-        // load the codeplug
-        let codeplug = load(&opt)?;
-        // write() validates the radio model and output paths
-        radios::write_codeplug(&codeplug, &opt)?;
-    } else if opt.operation == "validate" || opt.operation == "v" {
-        eprintln!("Validating codeplug...");
-    } else if opt.operation == "filter" || opt.operation == "f" {
-        eprintln!("Filtering codeplug...");
+    // write to file or stdout
+    if output_path.is_none() {
+        uprintln!(opt, Stderr, Color::Green, None, "Writing codeplug to stdout");
+        uprintln!(opt, Stdout, None, None, "{}", file_str);
     } else {
-        eprintln!("Invalid operation: {}", opt.operation);
-        std::process::exit(1);
+        uprintln!(opt, Stderr, Color::Green, None, "Writing codeplug to {:?}", output_path.as_ref().unwrap());
+        std::fs::write(output_path.as_ref().unwrap(), file_str)?;
     }
 
-    eprintln!("Completed with {} errors, {} warnings. Have a nice day!", 0, 0);
+    uprintln!(opt, Stderr, Color::Cyan, None, "Codeplug has {} channels, {} zones, {} talkgroups, {} talkgroup lists",
+        codeplug.channels.len(), codeplug.zones.len(), codeplug.talkgroups.len(), codeplug.talkgroup_lists.len());
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let opt: Opt = Opt::parse();
+    // all output except the actual codeplug data should go to stderr
+    uprintln!(opt, Stderr, Color::Green, 1, "Welcome to the plungle, we got fun and games!");
+    uprintln!(opt, Stderr, None, 3, "{:?}", opt);
+
+    match &opt.command {
+        Some(Commands::Parse { model, input, output }) => {
+            // parse codeplug
+            let mut codeplug = radios::parse_codeplug(model, input, &opt)?;
+            // filter codeplug
+            codeplug = filter_codeplug(&codeplug, &opt)?;
+            // validate codeplug
+            radios::validate_codeplug(&codeplug, &opt)?;
+            // write intermediary file
+            write_codeplug(&output, &codeplug, &opt)?;
+        }
+        Some(Commands::Generate { model, input, output }) => {
+            // read intermediary file
+            let mut codeplug = read_codeplug(&input, &opt)?;
+            // filter codeplug
+            codeplug = filter_codeplug(&codeplug, &opt)?;
+            // validate codeplug
+            radios::validate_codeplug(&codeplug, &opt)?;
+            // generate codeplug
+            radios::generate_codeplug(&codeplug, &model, &output, &opt)?;
+        }
+        Some(Commands::Merge { inputs: _ }) => {
+            // @TODO implement merge
+            uprintln!(opt, Stderr, Color::Red, None, "merge - Operation unsupported!");
+        }
+        None => { // this should never happen because of arg_required_else_help
+            uprintln!(opt, Stderr, Color::Red, None, "No command specified");
+        }
+    }
     Ok(())
 }

@@ -168,7 +168,7 @@ type CsvRecord = HashMap<String, String>;
 // READ ///////////////////////////////////////////////////////////////////////
 
 fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup, Box<dyn Error>> {
-    dprintln!(opt.verbose, 4, "    {:?}", record);
+    uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     let talkgroup = DmrTalkgroup {
         id: record.get("Radio ID").unwrap().parse::<u32>()?,
         name: record.get("Name").unwrap().to_string(),
@@ -184,7 +184,7 @@ fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup,
 }
 
 fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<DmrTalkgroupList, Box<dyn Error>> {
-    dprintln!(opt.verbose, 4, "    {:?}", record);
+    uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     let mut talkgroup_list = DmrTalkgroupList {
         name: record.get("Group Name").unwrap().to_string(),
         talkgroups: Vec::new(),
@@ -230,7 +230,7 @@ fn parse_tone(tone: &str) -> Option<Tone> {
 
 // Convert the CSV channel hashmap into a Channel struct
 fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
-    dprintln!(opt.verbose, 4, "    {:?}", record);
+    uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     let mut channel = Channel {
         index: 0,
         name: String::new(),
@@ -298,7 +298,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
 
 // Convert the CSV zone hashmap into a Zone struct
 fn parse_zone_record(csv_zone: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<Zone, Box<dyn Error>> {
-    dprintln!(opt.verbose, 4, "    {:?}", csv_zone);
+    uprintln!(opt, Stderr, None, 4, "    {:?}", csv_zone);
     let mut zone = Zone {
         name: String::new(),
         channels: Vec::new(),
@@ -321,7 +321,7 @@ fn parse_zone_record(csv_zone: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Re
 
 // Convert the CSV DMR ID hashmap into a DMRId struct
 fn parse_dmr_id_record(csv_dmr_id: &CsvRecord, opt: &Opt) -> Result<DmrId, Box<dyn Error>> {
-    dprintln!(opt.verbose, 4, "    {:?}", csv_dmr_id);
+    uprintln!(opt, Stderr, None, 4, "    {:?}", csv_dmr_id);
     let dmr_id = DmrId {
         id: csv_dmr_id.get("Radio ID").unwrap().parse::<u32>()?,
         name: csv_dmr_id.get("Name").unwrap().to_string(),
@@ -330,9 +330,9 @@ fn parse_dmr_id_record(csv_dmr_id: &CsvRecord, opt: &Opt) -> Result<DmrId, Box<d
     Ok(dmr_id)
 }
 
-pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 4, "{:?}", get_props());
+pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let mut codeplug = Codeplug {
         channels: Vec::new(),
@@ -344,17 +344,10 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     };
 
     // check that the input path is a directory
-    let input_path = match &opt.input {
-        Some(path) => {
-            if path.is_dir() {
-                path
-            } else {
-                cprintln!(ANSI_C_RED, "You lied to me when you told me this was a directory: {}", path.display());
-                return Err("Bad input path".into());
-            }
-        }
-        None => return Err("Bad input path".into()),
-    };
+    if !input_path.is_dir() {
+        uprintln!(opt, Stderr, Color::Red, None, "You lied to me when you told me this was a directory: {}", input_path.display());
+        return Err("Bad input path".into());
+    }
 
     // Check for TalkGroups.CSV, some CPS versions call this ContactTalkGroups.CSV
     let mut talkgroups_path: PathBuf = input_path.clone();
@@ -366,7 +359,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     }
     // if neither file exist, no problem, we just don't have any talkgroups
     if talkgroups_path.exists() {
-        dprintln!(opt.verbose, 3, "Reading {}", talkgroups_path.display());
+        uprintln!(opt, Stderr, None, 3, "Reading {}", talkgroups_path.display());
         let mut reader = csv::Reader::from_path(talkgroups_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
@@ -383,7 +376,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     // if this file doesn't exist, no problem, we just don't have any talkgroup lists
     // also, no point in reading this if we don't have any talkgroups
     if talkgroup_lists_path.exists() && !codeplug.talkgroups.is_empty() {
-        dprintln!(opt.verbose, 3, "Reading {}", talkgroup_lists_path.display());
+        uprintln!(opt, Stderr, None, 3, "Reading {}", talkgroup_lists_path.display());
         let mut reader = csv::Reader::from_path(talkgroup_lists_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
@@ -400,7 +393,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     if !channels_path.exists() {
         return Err("Channel.CSV not found".into());
     } else {
-        dprintln!(opt.verbose, 3, "Reading {}", channels_path.display());
+        uprintln!(opt, Stderr, None, 3, "Reading {}", channels_path.display());
         let mut reader = csv::Reader::from_path(channels_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
@@ -421,7 +414,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     zones_path.push("Zone.CSV");
     // if Zone.CSV doesn't exist, no problem, we just don't have any zones
     if zones_path.exists() {
-        dprintln!(opt.verbose, 3, "Reading {}", zones_path.display());
+        uprintln!(opt, Stderr, None, 3, "Reading {}", zones_path.display());
         let mut reader = csv::Reader::from_path(zones_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
@@ -437,7 +430,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     radio_id_list_path.push("RadioIDList.CSV");
     // if this file doesn't exist, no problem, we just don't set the radio ID list
     if radio_id_list_path.exists() {
-        dprintln!(opt.verbose, 3, "Reading {}", radio_id_list_path.display());
+        uprintln!(opt, Stderr, None, 3, "Reading {}", radio_id_list_path.display());
         // Sometimes RadioIDList.CSV has an extra "Name" column in the header, so we need to do some dumb stuff to work around this
         // read the file into a string
         let radio_id_list_content = fs::read_to_string(radio_id_list_path)?;
@@ -469,8 +462,8 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
 // WRITE //////////////////////////////////////////////////////////////////////
 
 pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
         .quote_style(csv::QuoteStyle::Always) // Anytone CPS expects all fields to be quoted
@@ -487,7 +480,7 @@ pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Resul
     ])?;
 
     for (ii, talkgroup) in codeplug.talkgroups.iter().enumerate() {
-        dprintln!(opt.verbose, 4, "Writing talkgroup {:width$}: {}", talkgroup.id, talkgroup.name, width = 8);
+        uprintln!(opt, Stderr, None, 4, "Writing talkgroup {:width$}: {}", talkgroup.id, talkgroup.name, width = 8);
         writer.write_record(&[
             format!("{}", ii + 1), // No.
             talkgroup.id.to_string(), // Radio ID
@@ -507,8 +500,8 @@ pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Resul
 }
 
 pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
         .quote_style(csv::QuoteStyle::Always) // Anytone CPS expects all fields to be quoted
@@ -524,7 +517,7 @@ pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> 
     ])?;
 
     for (ii, talkgroup_list) in codeplug.talkgroup_lists.iter().enumerate() {
-        dprintln!(opt.verbose, 4, "Writing talkgroup list {:width$}: {}", ii + 1, talkgroup_list.name, width = 3);
+        uprintln!(opt, Stderr, None, 4, "Writing talkgroup list {:width$}: {}", ii + 1, talkgroup_list.name, width = 3);
         let mut contact = String::new();
         let mut contact_id = String::new();
         for (jj, talkgroup) in talkgroup_list.talkgroups.iter().enumerate() {
@@ -595,8 +588,8 @@ fn write_scan_list(channel: &Channel, codeplug: &Codeplug) -> String {
 }
 
 pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
         .quote_style(csv::QuoteStyle::Always)
@@ -663,8 +656,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
     ])?;
 
     for channel in &codeplug.channels {
-        dprintln!(opt.verbose, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width = get_props().channel_index_width);
-        dprintln!(opt.verbose, 4, "    {:?}", channel);
+        uprintln!(opt, Stderr, None, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width = get_props().channel_index_width);
+        uprintln!(opt, Stderr, None, 4, "    {:?}", channel);
         if channel.mode == ChannelMode::FM {
             writer.write_record(&[
                 channel.index.to_string(), // No.
@@ -804,7 +797,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 "0".to_string(), // ex_emg_kind
             ])?;
         } else {
-            cprintln!(ANSI_C_YLW, "Unsupported channel mode: index = {}, mode = {:?}", channel.index, channel.mode);
+            uprintln!(opt, Stderr, Color::Red, None, "Unsupported channel mode: index = {}, mode = {:?}", channel.index, channel.mode);
         }
     }
 
@@ -814,8 +807,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
 }
 
 pub fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
         .quote_style(csv::QuoteStyle::Always) // Anytone CPS expects all fields to be quoted
@@ -839,7 +832,7 @@ pub fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(),
     ])?;
 
     for (ii, zone) in codeplug.zones.iter().enumerate() {
-        dprintln!(opt.verbose, 4, "Writing zone {:width$}: {}", ii + 1, zone.name, width = 3);
+        uprintln!(opt, Stderr, None, 4, "Writing zone {:width$}: {}", ii + 1, zone.name, width = 3);
         let mut channel_names = String::new();
         let mut channel_rx_frequencies = String::new();
         let mut channel_tx_frequencies = String::new();
@@ -879,8 +872,8 @@ pub fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(),
 }
 
 pub fn write_scanlists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
         .quote_style(csv::QuoteStyle::Always) // Anytone CPS expects all fields to be quoted
@@ -910,7 +903,7 @@ pub fn write_scanlists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result
     ])?;
 
     for (ii, zone) in codeplug.zones.iter().enumerate() {
-        dprintln!(opt.verbose, 4, "Writing scan list {:width$}: {}", ii + 1, zone.name, width = 3);
+        uprintln!(opt, Stderr, None, 4, "Writing scan list {:width$}: {}", ii + 1, zone.name, width = 3);
         let mut channel_names = String::new();
         let mut channel_rx_frequencies = String::new();
         let mut channel_tx_frequencies = String::new();
@@ -954,62 +947,60 @@ pub fn write_scanlists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result
 }
 
 
-pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 4, "{:?}", get_props());
+pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     // if the output path exists, check if it is an empty directory
     // if it does not exist, create it
-    if let Some(output_path) = &opt.output {
-        if output_path.exists() {
-            if output_path.is_dir() {
-                // check if the directory is empty
-                let dir_entries = std::fs::read_dir(output_path)?;
-                if dir_entries.count() > 0 {
-                    cprintln!(ANSI_C_RED, "Output path exists and is not empty, not overwriting!");
-                    return Err("Bad output path".into());
-                }
+    if output_path.exists() {
+        if output_path.is_dir() {
+            // check if the directory is empty
+            let dir_entries = std::fs::read_dir(output_path)?;
+            if dir_entries.count() > 0 {
+                uprintln!(opt, Stderr, Color::Red, None, "Output path exists and is not empty, not overwriting!");
+                return Err("Bad output path".into());
             }
-        } else {
-            // if it does not exist, create it
-            std::fs::create_dir_all(output_path)?;
         }
-        if fs::metadata(output_path)?.permissions().readonly() {
-            cprintln!(ANSI_C_RED, "Output path is read-only, cannot write!");
-            return Err("Bad output path".into());
-        }
+    } else {
+        // if it does not exist, create it
+        std::fs::create_dir_all(output_path)?;
+    }
+    if fs::metadata(output_path)?.permissions().readonly() {
+        uprintln!(opt, Stderr, Color::Red, None, "Output path is read-only, cannot write!");
+        return Err("Bad output path".into());
     }
 
     // write to TalkGroups.CSV
-    let mut talkgroups_path: PathBuf = opt.output.clone().unwrap();
-    talkgroups_path.push(if opt.excel { "TalkGroups2.CSV" } else { "TalkGroups.CSV" });
+    let mut talkgroups_path: PathBuf = output_path.clone();
+    talkgroups_path.push("TalkGroups.CSV");
     if codeplug.talkgroups.len() > 0 {
         write_talkgroups(codeplug, &talkgroups_path, opt)?;
     }
 
     // write to ReceiveGroupCallList.CSV
-    let mut talkgroup_lists_path: PathBuf = opt.output.clone().unwrap();
-    talkgroup_lists_path.push(if opt.excel { "ReceiveGroupCallList2.CSV" } else { "ReceiveGroupCallList.CSV" });
+    let mut talkgroup_lists_path: PathBuf = output_path.clone();
+    talkgroup_lists_path.push("ReceiveGroupCallList.CSV");
     if codeplug.talkgroups.len() > 0 {
         write_talkgroup_lists(codeplug, &talkgroup_lists_path, opt)?;
     }
 
     // write to Channel.CSV
-    let mut channels_path: PathBuf = opt.output.clone().unwrap();
-    channels_path.push(if opt.excel { "Channel2.CSV" } else { "Channel.CSV" });
+    let mut channels_path: PathBuf = output_path.clone();
+    channels_path.push("Channel.CSV");
     write_channels(codeplug, &channels_path, opt)?;
 
     // write to Zone.CSV
-    let mut zones_path: PathBuf = opt.output.clone().unwrap();
-    zones_path.push(if opt.excel { "Zone2.CSV" } else { "Zone.CSV" });
+    let mut zones_path: PathBuf = output_path.clone();
+    zones_path.push("Zone.CSV");
     if codeplug.zones.len() > 0 {
         write_zones(codeplug, &zones_path, opt)?;
     }
 
     // write to ScanList.CSV
     // Copy zones to scan lists since we don't support scan lists yet @TODO
-    let mut scanlists_path: PathBuf = opt.output.clone().unwrap();
-    scanlists_path.push(if opt.excel { "ScanList2.CSV" } else { "ScanList.CSV" });
+    let mut scanlists_path: PathBuf = output_path.clone();
+    scanlists_path.push("ScanList.CSV");
     if codeplug.zones.len() > 0 {
         write_scanlists(codeplug, &scanlists_path, opt)?;
     }
