@@ -13,14 +13,14 @@ Please also see [qdmr](https://dm3mat.darc.de/qdmr/), a tool by DM3MAT that reve
 
 ## Usage
 
-Read a CSV export of a codeplug:
+Parse a codeplug export from Radio A into an intermediary format
 ```
-plungle read <radio-a> <csv-export-dir> > codeplug.json
+plungle parse <radio-a> <csv-export-dir> codeplug.json
 ```
 
-Write a codeplug CSV export for a different radio:
+Generate a codeplug export for Radio B from an intermediary format
 ```
-plungle write <radio-b> codeplug.json <output-dir>
+plungle generate <radio-b> codeplug.json <output-dir>
 ```
 
 ### Example
@@ -29,16 +29,16 @@ For this example, we are going to convert a codeplug for the Retevis RT3S runnin
 
 First, you must open the codeplug in the OpenGD77 CPS and export to CSV. For this example, we will assume this export directory is named `opengd77_csv`.
 
-Read the exported codeplug (plungle uses JSON as an intermediary data format):
+Parse the exported codeplug (plungle uses JSON as an intermediary data format):
 
 ```
-plungle read opengd77_rt3s opengd77_csv > codeplug.json
+plungle parse opengd77_rt3s opengd77_csv codeplug.json
 ```
 
-Write the codeplug export files for the target radio (where `output` is a directory that will be created containing CSV files to be imported into the Anytone CPS):
+Generate the codeplug export files for the target radio (where `output` is a directory that will be created containing CSV files to be imported into the Anytone CPS):
 
 ```
-plungle write anytone_x78 codeplug.json output
+plungle generate anytone_x78 codeplug.json output
 ```
 
 ## Documentation
@@ -56,12 +56,14 @@ Complete documentation is not yet written.
 
 Future features that may eventually be added include:
 
-* TOML, YAML, and CSV as intermediary data formats
+* TOML, and CSV as intermediary data formats
 * Generic Chirp input/output
 * Merging multiple codeplugs
 * Filtering codeplugs
 * Batch editing operations
-* Support for Motorola XPR 7550
+* Support for Motorola XPR 7550/e (VHF/UHF)
+* Support for Motorola XPR 6550 (VHF/UHF)
 * Support for Retevis RT3S on stock firmware, and TYT MD-UV380/MD-UV390 on both stock and OpenGD77 firmware
 * Support for Ailunce HD1
 * Support for Yaesu FT-3D
+* Support for Alinco DJ-MD5
