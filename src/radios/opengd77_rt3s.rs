@@ -85,7 +85,7 @@ type CsvRecord = HashMap<String, String>;
 // READ ///////////////////////////////////////////////////////////////////////
 
 pub fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup, Box<dyn Error>> {
-    dprintln!(opt.verbose, 4, "    {:?}", record);
+    uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     let talkgroup = DmrTalkgroup {
         id: record.get("ID").unwrap().parse()?,
         name: record.get("Contact Name").unwrap().to_string(),
@@ -100,7 +100,7 @@ pub fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgr
 }
 
 pub fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<DmrTalkgroupList, Box<dyn Error>> {
-    dprintln!(opt.verbose, 4, "    {:?}", record);
+    uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     let mut talkgroup_list = DmrTalkgroupList {
         name: record.get("TG List Name").unwrap().to_string(),
         talkgroups: Vec::new(),
@@ -115,7 +115,7 @@ pub fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug, opt:
             if let Some(tg) = talkgroup {
                 talkgroup_list.talkgroups.push(tg.clone());
             } else {
-                cprintln!(ANSI_C_YLW, "Talkgroup not found: {}", value);
+                uprintln!(opt, Stderr, Color::Yellow, None, "Talkgroup not found: {}", value);
             }
         }
     }
@@ -208,7 +208,7 @@ fn parse_squelch(squelch: &str) -> Squelch {
 }
 
 pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
-    dprintln!(opt.verbose, 4, "    {:?}", record);
+    uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     let mut channel = Channel {
         index: 0,
         name: String::new(),
@@ -273,7 +273,7 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
 }
 
 pub fn parse_zone_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<Zone, Box<dyn Error>> {
-    dprintln!(opt.verbose, 4, "    {:?}", record);
+    uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     let mut zone = Zone {
         name: record.get("Zone Name").unwrap().to_string(),
         channels: Vec::new(),
@@ -288,16 +288,16 @@ pub fn parse_zone_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> 
             if let Some(ch) = channel {
                 zone.channels.push(ch.name.clone());
             } else {
-                cprintln!(ANSI_C_YLW, "Channel not found: {}", value);
+                uprintln!(opt, Stderr, Color::Yellow, None, "Channel not found: {}", value);
             }
         }
     }
     Ok(zone)
 }
 
-pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 4, "{:?}", get_props());
+pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let mut codeplug = Codeplug {
         channels: Vec::new(),
@@ -309,24 +309,17 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     };
 
     // check that the input path is a directory
-    let input_path = match &opt.input {
-        Some(path) => {
-            if path.is_dir() {
-                path
-            } else {
-                cprintln!(ANSI_C_RED, "You lied to me when you told me this was a directory: {}", path.display());
-                return Err("Bad input path".into());
-            }
-        }
-        None => return Err("Bad input path".into()),
-    };
+    if !input_path.is_dir() {
+        uprintln!(opt, Stderr, Color::Red, None, "You lied to me when you told me this was a directory: {}", input_path.display());
+        return Err("Bad input path".into());
+    }
 
     // Check for Contacts.csv
     let mut talkgroups_path: PathBuf = input_path.clone();
     talkgroups_path.push("Contacts.csv");
     // if Contacts.csv doesn't exist, no problem, we just don't have any talkgroups
     if talkgroups_path.exists() {
-        dprintln!(opt.verbose, 3, "Reading {}", talkgroups_path.display());
+        uprintln!(opt, Stderr, None, 3, "Reading {}", talkgroups_path.display());
         let mut reader = csv::Reader::from_path(talkgroups_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
@@ -343,7 +336,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     // if TG_Lists.csv doesn't exist, no problem, we just don't have any talkgroup lists
     // also, no point in reading this if we don't have any talkgroups
     if talkgroup_lists_path.exists() && !codeplug.talkgroups.is_empty() {
-        dprintln!(opt.verbose, 3, "Reading {}", talkgroup_lists_path.display());
+        uprintln!(opt, Stderr, None, 3, "Reading {}", talkgroup_lists_path.display());
         let mut reader = csv::Reader::from_path(talkgroup_lists_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
@@ -360,7 +353,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     if !channels_path.exists() {
         return Err("Channels.csv not found".into());
     } else {
-        dprintln!(opt.verbose, 3, "Reading {}", channels_path.display());
+        uprintln!(opt, Stderr, None, 3, "Reading {}", channels_path.display());
         let mut reader = csv::Reader::from_path(channels_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
@@ -376,7 +369,7 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     zones_path.push("Zones.csv");
     // if Zones.csv doesn't exist, no problem, we just don't have any zones
     if zones_path.exists() {
-        dprintln!(opt.verbose, 3, "Reading {}", zones_path.display());
+        uprintln!(opt, Stderr, None, 3, "Reading {}", zones_path.display());
         let mut reader = csv::Reader::from_path(zones_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
@@ -392,8 +385,8 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
 // WRITE //////////////////////////////////////////////////////////////////////
 
 pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
         .terminator(csv::Terminator::CRLF)
@@ -408,7 +401,7 @@ pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Resul
     ])?;
 
     for talkgroup in &codeplug.talkgroups {
-        dprintln!(opt.verbose, 4, "Writing talkgroup: {}", talkgroup.name);
+        uprintln!(opt, Stderr, None, 4, "Writing talkgroup: {}", talkgroup.name);
         writer.write_record(&[
             talkgroup.name.clone(), // Contact Name
             talkgroup.id.to_string(), // ID
@@ -427,8 +420,8 @@ pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Resul
 }
 
 pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
         .terminator(csv::Terminator::CRLF)
@@ -442,7 +435,7 @@ pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> 
     writer.write_record(&header)?;
 
     for talkgroup_list in &codeplug.talkgroup_lists {
-        dprintln!(opt.verbose, 4, "Writing talkgroup list: {}", talkgroup_list.name);
+        uprintln!(opt, Stderr, None, 4, "Writing talkgroup list: {}", talkgroup_list.name);
         let mut record = vec![talkgroup_list.name.clone()];
         for tg in &talkgroup_list.talkgroups {
             record.push(tg.name.clone());
@@ -515,8 +508,8 @@ fn write_power(power: &Power) -> String {
 }
 
 pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
         .terminator(csv::Terminator::CRLF)
@@ -555,7 +548,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
     ])?;
 
     for channel in &codeplug.channels {
-        dprintln!(opt.verbose, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width = get_props().channel_index_width);
+        uprintln!(opt, Stderr, None, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width = get_props().channel_index_width);
         if channel.mode == ChannelMode::FM {
             writer.write_record(&[
                 channel.index.to_string(), // Channel Number
@@ -629,7 +622,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 "No".to_string(), // Use location
             ])?;
         } else {
-            cprintln!(ANSI_C_YLW, "Unsupported channel mode: index = {}, mode = {:?}", channel.index, channel.mode);
+            uprintln!(opt, Stderr, Color::Yellow, None, "Unsupported channel mode: index = {}, mode = {:?}", channel.index, channel.mode);
         }
     }
 
@@ -639,8 +632,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
 }
 
 fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
         .terminator(csv::Terminator::CRLF)
@@ -654,7 +647,7 @@ fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box
     writer.write_record(&header)?;
 
     for zone in &codeplug.zones {
-        dprintln!(opt.verbose, 4, "Writing zone: {}", zone.name);
+        uprintln!(opt, Stderr, None, 4, "Writing zone: {}", zone.name);
         let mut record = vec![zone.name.clone()];
         for ch in &zone.channels {
             record.push(ch.clone());
@@ -669,54 +662,52 @@ fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box
     Ok(())
 }
 
-pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 4, "{:?}", get_props());
+pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     // if the output path exists, check if it is an empty directory
     // if it does not exist, create it
-    if let Some(output_path) = &opt.output {
-        if output_path.exists() {
-            if output_path.is_dir() {
-                // check if the directory is empty
-                let dir_entries = std::fs::read_dir(output_path)?;
-                if dir_entries.count() > 0 {
-                    cprintln!(ANSI_C_RED, "Output path exists and is not empty, not overwriting!");
-                    return Err("Bad output path".into());
-                }
+    if output_path.exists() {
+        if output_path.is_dir() {
+            // check if the directory is empty
+            let dir_entries = std::fs::read_dir(output_path)?;
+            if dir_entries.count() > 0 {
+                uprintln!(opt, Stderr, Color::Red, None, "Output path exists and is not empty, not overwriting!");
+                return Err("Bad output path".into());
             }
-        } else {
-            // if it does not exist, create it
-            std::fs::create_dir_all(output_path)?;
         }
-        if fs::metadata(output_path)?.permissions().readonly() {
-            cprintln!(ANSI_C_RED, "Output path is read-only, cannot write!");
-            return Err("Bad output path".into());
-        }
+    } else {
+        // if it does not exist, create it
+        std::fs::create_dir_all(output_path)?;
+    }
+    if fs::metadata(output_path)?.permissions().readonly() {
+        uprintln!(opt, Stderr, Color::Red, None, "Output path is read-only, cannot write!");
+        return Err("Bad output path".into());
     }
 
     // write to Contacts.csv
-    let mut talkgroups_path: PathBuf = opt.output.as_ref().unwrap().clone();
-    talkgroups_path.push(if opt.excel { "Contacts2.csv" } else { "Contacts.csv" });
+    let mut talkgroups_path: PathBuf = output_path.clone();
+    talkgroups_path.push("Contacts.csv");
     if codeplug.talkgroups.len() > 0 {
         write_talkgroups(&codeplug, &talkgroups_path, opt)?;
     }
 
     // write to TG_Lists.csv
-    let mut talkgroup_lists_path: PathBuf = opt.output.as_ref().unwrap().clone();
-    talkgroup_lists_path.push(if opt.excel { "TG_Lists2.csv" } else { "TG_Lists.csv" });
+    let mut talkgroup_lists_path: PathBuf = output_path.clone();
+    talkgroup_lists_path.push("TG_Lists.csv");
     if codeplug.talkgroup_lists.len() > 0 {
         write_talkgroup_lists(&codeplug, &talkgroup_lists_path, opt)?;
     }
 
     // write to Channels.csv
-    let mut channels_path: PathBuf = opt.output.as_ref().unwrap().clone();
-    channels_path.push(if opt.excel { "Channels2.csv" } else { "Channels.csv" });
+    let mut channels_path: PathBuf = output_path.clone();
+    channels_path.push("Channels.csv");
     write_channels(&codeplug, &channels_path, opt)?;
 
     // write to Zones.csv
-    let mut zones_path: PathBuf = opt.output.as_ref().unwrap().clone();
-    zones_path.push(if opt.excel { "Zones2.csv" } else { "Zones.csv" });
+    let mut zones_path: PathBuf = output_path.clone();
+    zones_path.push("Zones.csv");
     if codeplug.zones.len() > 0 {
         write_zones(&codeplug, &zones_path, opt)?;
     }

@@ -107,7 +107,7 @@ fn parse_tone(tone: &str) -> Option<Tone> {
 }
 
 fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
-    dprintln!(opt.verbose, 4, "{:?}", record);
+    uprintln!(opt, Stderr, None, 4, "{:?}", record);
 
     let mut channel = Channel::default();
 
@@ -154,9 +154,9 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
     Ok(channel)
 }
 
-pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 4, "{:?}", get_props());
+pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let mut codeplug = Codeplug {
         channels: Vec::new(),
@@ -168,24 +168,17 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     };
 
     // check that the input path is a directory
-    let input_path = match &opt.input {
-        Some(path) => {
-            if path.is_dir() {
-                path
-            } else {
-                cprintln!(ANSI_C_RED, "You lied to me when you told me this was a directory: {}", path.display());
-                return Err("Bad input path".into());
-            }
-        }
-        None => return Err("Bad input path".into()),
-    };
+    if !input_path.is_dir() {
+        uprintln!(opt, Stderr, Color::Red, None, "You lied to me when you told me this was a directory: {}", input_path.display());
+        return Err("Bad input path".into());
+    }
 
     // check for Channels.csv
     let channels_path: PathBuf = input_path.join("Channels.csv");
     if !channels_path.exists() {
         return Err("Channels.csv not found".into());
     } else {
-        dprintln!(opt.verbose, 3, "Reading {}", channels_path.display());
+        uprintln!(opt, Stderr, None, 3, "Reading {}", channels_path.display());
         let mut reader = csv::Reader::from_path(&channels_path)?;
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
@@ -204,8 +197,8 @@ pub fn read(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
 // WRITE //////////////////////////////////////////////////////////////////////
 
 pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 1, "Writing {}", path.display());
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
     .from_path(path)?;
@@ -252,8 +245,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
     ])?;
 
     for channel in &codeplug.channels {
-        dprintln!(opt.verbose, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width = get_props().channel_index_width);
-        dprintln!(opt.verbose, 4, "    {:?}", channel);
+        uprintln!(opt, Stderr, None, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width = get_props().channel_index_width);
+        uprintln!(opt, Stderr, None, 4, "    {:?}", channel);
 
     }
 
@@ -261,35 +254,33 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
     Ok(())
 }
 
-pub fn write(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
-    dprintln!(opt.verbose, 4, "{:?}", get_props());
+pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     // if the output path exists, check if it is an empty directory
     // if it does not exist, create it
-    if let Some(output_path) = &opt.output {
-        if output_path.exists() {
-            if output_path.is_dir() {
-                // check if the directory is empty
-                let dir_entries = std::fs::read_dir(output_path)?;
-                if dir_entries.count() > 0 {
-                    cprintln!(ANSI_C_RED, "Output path exists and is not empty, not overwriting!");
-                    return Err("Bad output path".into());
-                }
+    if output_path.exists() {
+        if output_path.is_dir() {
+            // check if the directory is empty
+            let dir_entries = std::fs::read_dir(output_path)?;
+            if dir_entries.count() > 0 {
+                uprintln!(opt, Stderr, Color::Red, None, "Output path exists and is not empty, not overwriting!");
+                return Err("Bad output path".into());
             }
-        } else {
-            // if it does not exist, create it
-            std::fs::create_dir_all(output_path)?;
         }
-        if fs::metadata(output_path)?.permissions().readonly() {
-            cprintln!(ANSI_C_RED, "Output path is read-only, cannot write!");
-            return Err("Bad output path".into());
-        }
+    } else {
+        // if it does not exist, create it
+        std::fs::create_dir_all(output_path)?;
+    }
+    if fs::metadata(output_path)?.permissions().readonly() {
+        uprintln!(opt, Stderr, Color::Red, None, "Output path is read-only, cannot write!");
+        return Err("Bad output path".into());
     }
 
     // write to Channels.csv
-    let mut channels_path: PathBuf = opt.output.clone().unwrap();
-    channels_path.push(if opt.excel { "Channels2.CSV" } else { "Channels.CSV" });
+    let mut channels_path: PathBuf = output_path.clone();
+    channels_path.push("Channels.CSV");
     write_channels(codeplug, &channels_path, opt)?;
 
     Ok(())

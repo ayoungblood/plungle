@@ -7,85 +7,77 @@ use crate::Opt;
 use crate::structures::Codeplug;
 use crate::*;
 use crate::validate::validate_generic;
+use crate::validate::validate_specific;
+use crate::validate::Complaint;
+use crate::validate::print_complaints;
 
 mod anytone_x78;
 mod opengd77_rt3s;
 mod chirp_generic;
 mod ailunce_hd1;
 
-pub fn read_codeplug(opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+pub fn parse_codeplug(model: &String, input: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     // build up a hashmap of function pointers
-    let mut read_functions: HashMap<&str, fn(&Opt) -> Result<Codeplug, Box<dyn Error>>>
+    let mut read_functions: HashMap<&str, fn(&PathBuf, &Opt) -> Result<Codeplug, Box<dyn Error>>>
         = HashMap::new();
     read_functions.insert("anytone_x78", anytone_x78::read);
     read_functions.insert("opengd77_rt3s", opengd77_rt3s::read);
     read_functions.insert("chirp_generic", chirp_generic::read);
     read_functions.insert("ailunce_hd1", ailunce_hd1::read);
 
-    if opt.radio.is_none() {
-        cprintln!(ANSI_C_RED, "Radio model is required for operation: read");
-        return Err("Bad radio model".into());
-    }
-
-    // validate the input path
-    if opt.input.is_none() {
-        cprintln!(ANSI_C_RED, "Input path is required for operation: read");
-        return Err("Bad input path".into());
-    }
-
-    let radio_model = opt.radio.as_ref().unwrap();
     // look up the radio model in the hashmap
-    if let Some(read_function) = read_functions.get(radio_model.as_str()) {
-        return read_function(opt);
+    if let Some(read_function) = read_functions.get(model.as_str()) {
+        return read_function(input, opt);
     } else {
-        cprintln!(ANSI_C_RED, "Unsupported radio model for operation: read");
-        cprintln!(ANSI_C_YLW, "Operation \"read\" supports the following radio models:");
-        for (radio_model, _) in read_functions.iter() {
-            cprintln!(ANSI_C_YLW, "    {}", radio_model);
+        uprintln!(opt, Stderr, Color::Red, None, "Unsupported radio model for operation: read");
+        uprintln!(opt, Stderr, None, None, "Operation \"read\" supports the following radio models:");
+        for (kk, _) in read_functions.iter() {
+            uprintln!(opt, Stderr, None, None, "    {}", kk);
         }
         return Err("Bad radio model".into());
     }
 }
 
-pub fn write_codeplug(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+pub fn generate_codeplug(codeplug: &Codeplug, model: &String, output: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     // build up a hashmap of function pointers
-    let mut write_functions: HashMap<&str, fn(&Codeplug, &Opt) -> Result<(), Box<dyn Error>>>
+    let mut write_functions: HashMap<&str, fn(&Codeplug, &PathBuf, &Opt) -> Result<(), Box<dyn Error>>>
         = HashMap::new();
     write_functions.insert("anytone_x78", anytone_x78::write);
     write_functions.insert("opengd77_rt3s", opengd77_rt3s::write);
     write_functions.insert("chirp_generic", chirp_generic::write);
     write_functions.insert("ailunce_hd1", ailunce_hd1::write);
 
-    if opt.radio.is_none() {
-        cprintln!(ANSI_C_RED, "Radio model is required for operation: write");
-        return Err("Bad radio model".into());
-    }
-
-    // validate the output path
-    if opt.output.is_none() {
-        cprintln!(ANSI_C_RED, "Output path is required for operation: write");
-        return Err("Bad output path".into());
-    }
-
-    let radio_model = opt.radio.as_ref().unwrap();
     // look up the radio model in the hashmap
-    if let Some(write_function) = write_functions.get(radio_model.as_str()) {
-        return write_function(codeplug, opt);
+    if let Some(write_function) = write_functions.get(model.as_str()) {
+        return write_function(codeplug, output, opt);
     } else {
-        cprintln!(ANSI_C_RED, "Unsupported radio model for operation: write");
-        cprintln!(ANSI_C_YLW, "Operation \"write\" supports the following radio models:");
-        for (radio_model, _) in write_functions.iter() {
-            cprintln!(ANSI_C_YLW, "    {}", radio_model);
+        uprintln!(opt, Stderr, Color::Red, None, "Unsupported radio model for operation: write");
+        uprintln!(opt, Stderr, None, None, "Operation \"write\" supports the following radio models:");
+        for (kk, _) in write_functions.iter() {
+            uprintln!(opt, Stderr, None, None, "    {}", kk);
         }
         return Err("Bad radio model".into());
     }
 }
 
 pub fn validate_codeplug(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    dprintln!(opt.verbose, 3, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    let mut complaints: Vec<Complaint> = Vec::new();
+    // load a band plan
+    let bandplan = bandplan::load_bandplan(opt)?;
     // generic validation
-    validate_generic(codeplug, opt)?;
+    complaints.extend(validate_generic(codeplug, &bandplan, opt).unwrap());
+    // radio-specific validation
+    let properties = structures::RadioProperties {
+        channels_max: 1024,
+        channel_name_width_max: 16,
+        channel_index_width: 4,
+    };
+    // specific validation
+    complaints.extend(validate_specific(codeplug, &properties, opt).unwrap());
+    // combine the complaints
+    print_complaints(&complaints, opt);
     Ok(())
 }
