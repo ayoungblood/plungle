@@ -1,0 +1,3 @@
+"No.","Zone Name","Zone Channel Member","A Channel","B Channel"
+"1","UHF","UHF Simplex|UHF ARep D>D|UHF ARep T>D|UHF ARep T>D1|UHF DRep C0S1|UHF DRep C15S2|UHF DRep noTX","UHF Simplex","UHF ARep D>D"
+"2","VHF","VHF Simplex|VHF ARep N>T|VHF ARep T>N|VHF ARep T>T BC","VHF Simplex","VHF ARep N>T"

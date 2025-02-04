@@ -1,0 +1,7 @@
+"No.","Radio ID","Name","Call Type","Call Alert"
+"1","2","2 LOCAL","Group Call","None"
+"2","9","9 LOCAL","Group Call","None"
+"3","16777215","ALLCALL","All Call","None"
+"4","91","91 BM World","Group Call","None"
+"5","310","TAC 310","Group Call","None"
+"6","313136","BM KC Wide","Group Call","None"
