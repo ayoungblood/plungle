@@ -139,7 +139,7 @@ pub struct Configuration {
 }
 
 /// Codeplug
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
 pub struct Codeplug {
     pub channels: Vec<Channel>,
     pub zones: Vec<Zone>,
@@ -150,11 +150,14 @@ pub struct Codeplug {
 }
 
 /// Radio Properties (e.g. supported modes, bands, counts)
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct RadioProperties {
-    // pub modes: Vec<ChannelMode>,
+    pub modes: Vec<ChannelMode>,
     pub channels_max: usize,
     pub channel_name_width_max: usize,
+    pub zones_max: usize,
+    pub zone_name_width_max: usize,
     // dynamically set
     pub channel_index_width: usize,
+    pub zone_index_width: usize,
 }
