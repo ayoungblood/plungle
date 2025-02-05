@@ -3,6 +3,9 @@ output/
 output.json
 bandplan.toml
 
+# test artifacts
+tests/temp
+
 # Added by cargo
 target/
 debug/

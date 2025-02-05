@@ -154,7 +154,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // filter codeplug
             codeplug = filter_codeplug(&codeplug, &opt)?;
             // validate codeplug
-            radios::validate_codeplug(&codeplug, &opt)?;
+            radios::validate_codeplug(&codeplug, &model, &opt)?;
             // write intermediary file
             write_codeplug(&output, &codeplug, &opt)?;
         }
@@ -164,7 +164,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // filter codeplug
             codeplug = filter_codeplug(&codeplug, &opt)?;
             // validate codeplug
-            radios::validate_codeplug(&codeplug, &opt)?;
+            radios::validate_codeplug(&codeplug, &model, &opt)?;
             // generate codeplug
             radios::generate_codeplug(&codeplug, &model, &output, &opt)?;
         }

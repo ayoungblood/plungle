@@ -134,25 +134,53 @@ pub fn validate_generic(codeplug: &structures::Codeplug, bandplan: &Bandplan, op
     Ok(complaints)
 }
 
-pub fn validate_specific(codeplug: &structures::Codeplug, properties: &structures::RadioProperties, opt: &Opt) -> Result<Vec<Complaint>, Box<dyn Error>> {
+pub fn validate_specific(codeplug: &structures::Codeplug, props: &structures::RadioProperties, opt: &Opt) -> Result<Vec<Complaint>, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     let mut complaints: Vec<Complaint> = Vec::new();
-
-    if codeplug.channels.len() > properties.channels_max as usize {
+    // check codeplug
+    if codeplug.channels.len() > props.channels_max as usize {
         complaints.push(Complaint {
             severity: Severity::Error,
-            message: format!("Too many channels: {} (max: {})", codeplug.channels.len(), properties.channels_max),
+            message: format!("Too many channels: {} (max: {})", codeplug.channels.len(), props.channels_max),
             source_index: None,
             source_name: None,
         });
     }
+    if codeplug.zones.len() > props.zones_max as usize {
+        complaints.push(Complaint {
+            severity: Severity::Error,
+            message: format!("Too many zones: {} (max: {})", codeplug.zones.len(), props.zones_max),
+            source_index: None,
+            source_name: None,
+        });
+    }
+    // check channels
     for channel in &codeplug.channels {
-        if channel.name.len() > 24 { // @TODO use properties for this
+        if channel.name.len() > props.channel_name_width_max  {
             complaints.push(Complaint {
                 severity: Severity::Warning,
                 message: format!("Name is too long (len: {})", channel.name.len()),
                 source_index: Some(channel.index),
                 source_name: Some(channel.name.clone()),
+            });
+        }
+        if !props.modes.contains(&channel.mode) {
+            complaints.push(Complaint {
+                severity: Severity::Error,
+                message: format!("Unsupported channel mode: {:?}", channel.mode),
+                source_index: Some(channel.index),
+                source_name: Some(channel.name.clone()),
+            });
+        }
+    }
+    // check zones
+    for zone in &codeplug.zones {
+        if zone.name.len() > props.zone_name_width_max  {
+            complaints.push(Complaint {
+                severity: Severity::Warning,
+                message: format!("Zone name is too long (len: {})", zone.name.len()),
+                source_index: None,
+                source_name: Some(zone.name.clone()),
             });
         }
     }

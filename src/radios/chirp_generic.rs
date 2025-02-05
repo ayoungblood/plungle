@@ -13,13 +13,17 @@ use crate::*;
 use crate::structures::*;
 
 static PROPS: OnceLock<structures::RadioProperties> = OnceLock::new();
-fn get_props() -> &'static structures::RadioProperties {
+pub fn get_props() -> &'static structures::RadioProperties {
     PROPS.get_or_init(|| {
         let mut props = structures::RadioProperties::default();
+        props.modes = vec![structures::ChannelMode::AM, structures::ChannelMode::FM];
         props.channels_max = 1024;
         props.channel_name_width_max = 16;
+        props.zones_max = 0; // chirp doesn't support zones
+        props.zone_name_width_max = 0;
         // dynamically set
         props.channel_index_width = (props.channels_max as f64).log10().ceil() as usize;
+        props.zone_index_width = (props.zones_max as f64).log10().ceil() as usize;
         props
     })
 }

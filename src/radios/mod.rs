@@ -70,10 +70,10 @@ pub fn get_properties(model: &String, opt: &Opt) -> Result<structures::RadioProp
     // build up a hashmap of function pointers
     let mut properties_functions: HashMap<&str, fn() -> &'static structures::RadioProperties>
         = HashMap::new();
-    // properties_functions.insert("anytone_x78", anytone_x78::properties);
-    // properties_functions.insert("opengd77_rt3s", opengd77_rt3s::properties);
-    // properties_functions.insert("chirp_generic", chirp_generic::properties);
-    // properties_functions.insert("ailunce_hd1", ailunce_hd1::properties);
+    properties_functions.insert("anytone_x78", anytone_x78::get_props);
+    properties_functions.insert("opengd77_rt3s", opengd77_rt3s::get_props);
+    properties_functions.insert("chirp_generic", chirp_generic::get_props);
+    properties_functions.insert("ailunce_hd1", ailunce_hd1::get_props);
     properties_functions.insert("alinco_djmd5t", alinco_djmd5t::get_props);
 
     // look up the radio model in the hashmap
@@ -89,7 +89,7 @@ pub fn get_properties(model: &String, opt: &Opt) -> Result<structures::RadioProp
     }
 }
 
-pub fn validate_codeplug(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
+pub fn validate_codeplug(codeplug: &Codeplug, model: &String, opt: &Opt) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     let mut complaints: Vec<Complaint> = Vec::new();
     // load a band plan
@@ -97,7 +97,7 @@ pub fn validate_codeplug(codeplug: &Codeplug, opt: &Opt) -> Result<(), Box<dyn E
     // generic validation
     complaints.extend(validate_generic(codeplug, &bandplan, opt).unwrap());
     // radio-specific validation
-    let properties = get_properties(&"alinco_djmd5t".to_string(), opt).unwrap();
+    let properties = get_properties(model, opt).unwrap();
     // specific validation
     complaints.extend(validate_specific(codeplug, &properties, opt).unwrap());
     // combine the complaints
