@@ -152,6 +152,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
             timeslot: record.get("Slot").unwrap().strip_prefix("Slot").unwrap().parse::<u8>()?,
             talkgroup: None,
             talkgroup_list: None,
+            id_name: None,
         });
     }
 
