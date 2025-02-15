@@ -213,19 +213,7 @@ fn parse_squelch(squelch: &str) -> Squelch {
 
 pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
-    let mut channel = Channel {
-        index: 0,
-        name: String::new(),
-        mode: ChannelMode::AM, // Default mode
-        frequency_rx: Decimal::new(0,0),
-        frequency_tx: Decimal::new(0,0),
-        rx_only: false,
-        tx_tot: Timeout {default: true, seconds: None},
-        power: Power {default: true, watts: None},
-        fm: None,
-        dmr: None,
-        scan: None,
-    };
+    let mut channel = Channel::default();
 
     // shared fields
     channel.index = record.get("Channel Number").unwrap().parse::<u32>()?;
@@ -271,6 +259,7 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
             } else {
                 Some(record.get("TG List").unwrap().to_string())
             },
+            id_name: None,
         });
     }
     Ok(channel)
@@ -576,7 +565,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 if channel.rx_only { "Yes".to_string() } else { "No".to_string() },
                 if channel.scan.is_some() && channel.scan.as_ref().unwrap().zone_skip { "Yes".to_string() } else { "No".to_string() }, // Zone Skip
                 if channel.scan.is_some() && channel.scan.as_ref().unwrap().all_skip { "Yes".to_string() } else { "No".to_string() }, // All Skip
-                if channel.tx_tot.default { "0".to_string() } else { channel.tx_tot.seconds.unwrap().to_string() }, // TOT
+                if channel.tx_tot.default || channel.tx_tot.seconds.is_none() { "0".to_string() } else { channel.tx_tot.seconds.unwrap().to_string() }, // TOT
                 "Off".to_string(), // VOX
                 "No".to_string(), // No Beep
                 "No".to_string(), // No Eco

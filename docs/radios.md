@@ -31,21 +31,25 @@ Based on V3.03 CPS
 * TX Frequencies: 136 - 174 MHz, 400 - 480 MHz
 * Supported modes: FM, NFM, DMR
 * Max channels: 4000
-* Max channel name length: ??
+* Max channel name length: 16
 * Max zones: 250
-* Max zone name length: ??
+* Max zone name length: 16
 * Max channels per zone: 250
 * Max scanlists: 250
-* Max scanlist name length: ??
+* Max scanlist name length: 16
 * Max channels per scanlist: ??
 * Max talkgroups: 10000
-* Max talkgroup name length: ??
-* Max talkgroup lists: ??
+* Max talkgroup name length: 16
+* Max talkgroup lists: 250
 * Max talkgroups per talkgroup list: ??
+
+* Max DMR IDs: 250
+* Max DMR ID name length: 16
 
 ### Anytone AT-D878UVII
 
 * TX Frequencies: 136 - 174 MHz, 400 - 480 MHz
+* CTCSS: 62.5 - 254.1 + custom (50 - 260)
 * Supported modes: FM, NFM, DMR
 * Max channels: 4000
 * Max channel name length: 16

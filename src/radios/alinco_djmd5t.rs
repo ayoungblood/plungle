@@ -64,7 +64,7 @@ pub fn get_props() -> &'static structures::RadioProperties {
 // - Contact Call Type: [Group Call, ???]
 // - Contact TG/DMR ID: DMR talkgroup ID
 // - Radio ID: Radio ID name (not DMR ID), generally callsign
-// - Busy Lock/TX Permit: [Off, Always, Different CDT, Channel Free, Same Color Code, Different Color Code]
+// - Busy Lock/TX Permit: [Off, Busy]
 // - Squelch Mode: [Carrier, CTCSS/DCS], Carrier for digital channels
 // - Optional Signal: Off
 // - DTMF ID: 1
@@ -169,6 +169,15 @@ fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Op
     Ok(talkgroup_list)
 }
 
+// Convert a string into a TxPermit enum
+fn parse_tx_permit(tx_permit: &str) -> Option<TxPermit> {
+    match tx_permit {
+        "Always" => Some(TxPermit::Always),
+        "Busy" => Some(TxPermit::ChannelFree),
+        _ => return None,
+    }
+}
+
 // Convert a CTCSS/DCS string into a Tone struct
 // Anytone stores CTCSS/DCS as follows:
 // - "Off" for no tone
@@ -196,19 +205,7 @@ fn parse_tone(tone: &str) -> Option<Tone> {
 // Convert the CSV channel hashmap into a Channel struct
 fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
-    let mut channel = Channel {
-        index: 0,
-        name: String::new(),
-        mode: ChannelMode::AM, // Default mode
-        frequency_rx: Decimal::new(0,0),
-        frequency_tx: Decimal::new(0,0),
-        rx_only: false,
-        tx_tot: Timeout {default: true, seconds: None}, // default to no timeout
-        power: Power {default: true, watts: None},
-        fm: None,
-        dmr: None,
-        scan: None,
-    };
+    let mut channel = Channel::default();
 
     channel.index = record.get("No.").unwrap().parse::<u32>()?;
     channel.name = record.get("Channel Name").unwrap().to_string();
@@ -227,6 +224,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
         "Low" => Power {default: false, watts: Some(Decimal::new(1, 0))}, // 1W
         _ => return Err(format!("Unrecognized power: {}", record.get("Transmit Power").unwrap()).into()),
     };
+    channel.tx_permit = parse_tx_permit(record.get("Busy Lock/TX Permit").unwrap().as_str());
     if channel.mode == ChannelMode::FM { // FM specific fields
         channel.fm = Some(FmChannel {
             bandwidth: match record.get("Band Width").unwrap().as_str() {
@@ -253,6 +251,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
             } else {
                 Some(record.get("Receive Group List").unwrap().to_string())
             },
+            id_name: Some(record.get("Radio ID").unwrap().to_string()),
         })
     } else {
         return Err("Unparsed channel mode".into());
@@ -471,7 +470,7 @@ pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> 
                 contact_id.push_str("|");
             }
             contact.push_str(&talkgroup.name);
-            contact_id.push_str(&talkgroup.id.to_string());
+            contact_id.push_str(&format!("\"{}\"", talkgroup.id));
         }
         writer.write_record(&[
             format!("{}", ii + 1), // No.
@@ -482,6 +481,14 @@ pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> 
     }
 
     writer.flush()?;
+
+    // absolutely horrific mungling
+    // the CPS expects contact IDs to be double-quoted, separated by |, and then all fields are quoted
+    // this results in a double-double quote, which the csv library turns into triple quotes, but we need double quotes
+    // open the file and replace double-double-quotes with a single double quote
+    let mut contents = fs::read_to_string(path)?;
+    contents = contents.replace("\"\"", "\"");
+    fs::write(path, contents)?;
 
     Ok(())
 }
@@ -504,20 +511,83 @@ fn write_power(power: &Power) -> String {
     }
 }
 
-// Anytone always needs both a talkgroup and a talkgroup list
-fn write_contact(channel: &Channel, codeplug: &Codeplug) -> String {
-    if channel.dmr.as_ref().unwrap().talkgroup.is_some() {
-        return channel.dmr.as_ref().unwrap().talkgroup.as_ref().unwrap().to_string();
+fn get_talkgroup_type_string(talkgroup: &DmrTalkgroup) -> String {
+    match talkgroup.call_type {
+        DmrTalkgroupCallType::Group => "Group Call".to_string(),
+        DmrTalkgroupCallType::Private => "Private Call".to_string(),
+        DmrTalkgroupCallType::AllCall => "All Call".to_string(),
+    }
+}
+
+// get a tuple with the talkgroup name, type, and id
+fn get_contact_tuple(channel: &Channel, codeplug: &Codeplug) -> (String, String, String) {
+    if channel.dmr.is_some() && channel.dmr.as_ref().unwrap().talkgroup.is_some() {
+        // if the channel has a talkgroup set, use that
+        let talkgroup_name = channel.dmr.as_ref().unwrap().talkgroup.as_ref().unwrap();
+        // find the talkgroup by name in the codeplug
+        let talkgroup = codeplug.talkgroups.iter().find(|&t| t.name == *talkgroup_name).unwrap();
+        let call_type = get_talkgroup_type_string(&talkgroup);
+        return (talkgroup.name.clone(), call_type.to_string(), talkgroup.id.to_string());
+    } else if channel.dmr.is_some() && channel.dmr.as_ref().unwrap().talkgroup_list.is_some() {
+        // if the channel has a talkgroup list, pick the first contact in the talkgroup list
+        if let Some(talkgroup_list_name) = &channel.dmr.as_ref().unwrap().talkgroup_list {
+            // find the talkgroup list by name in the codeplug
+            if let Some(talkgroup) = codeplug.talkgroup_lists.iter().find(|&t| t.name == *talkgroup_list_name) {
+                let talkgroup = &talkgroup.talkgroups[0];
+                let call_type = get_talkgroup_type_string(&talkgroup);
+                return (talkgroup.name.clone(), call_type.to_string(), talkgroup.id.to_string());
+            }
+        }
     } else {
-        // pick the first contact in the talkgroup list
-        if let Some(talkgroup_list) = &channel.dmr.as_ref().unwrap().talkgroup_list {
-            if let Some(talkgroup) = codeplug.talkgroup_lists.iter().find(|&t| t.name == *talkgroup_list) {
-                return talkgroup.talkgroups[0].id.to_string();
+        // if the channel has neither a talkgroup or a talkgroup list, use the first talkgroup
+        // this is used for analog channels to match the CPS behaviour
+        if !codeplug.talkgroups.is_empty() {
+            let talkgroup = &codeplug.talkgroups[0];
+            let call_type = get_talkgroup_type_string(&talkgroup);
+            return (talkgroup.name.clone(), call_type.to_string(), talkgroup.id.to_string());
+        }
+    }
+    // if everything fails, return empty strings
+    ("".to_string(), "".to_string(), "".to_string())
+}
+
+fn write_radio_id(channel: &Channel, codeplug: &Codeplug) -> String {
+    // if id_name  exists, use it, otherwise return the first radio ID in the codeplug
+    if let Some(dmr) = &channel.dmr {
+        if let Some(id_name) = &dmr.id_name {
+            return id_name.to_string();
+        }
+    } else if let Some(config) = &codeplug.config {
+        if let Some(dmr_config) = &config.dmr_configuration {
+            if !dmr_config.id_list.is_empty() {
+                return dmr_config.id_list[0].name.clone();
             }
         }
     }
     // if all else fails, return an empty string
     "".to_string()
+}
+
+fn write_tx_permit(channel: &Channel) -> String {
+    let tx_permit = match &channel.tx_permit {
+        Some(TxPermit::Always) => "Always".to_string(),
+        Some(TxPermit::ChannelFree) => "Busy".to_string(),
+        _ => "Off".to_string(),
+
+    };
+    tx_permit
+}
+
+// scan list needs to be set in the channel
+// right now, we build the scan list from the zone
+// so just pick the first zone that contains the channel, and set that as the scan list (if it exists)
+fn write_scan_list(channel: &Channel, codeplug: &Codeplug) -> String {
+    for zone in &codeplug.zones {
+        if zone.channels.contains(&channel.name) {
+            return zone.name.clone();
+        }
+    }
+    "None".to_string()
 }
 
 pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
@@ -574,6 +644,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
         uprintln!(opt, Stderr, None, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width = get_props().channel_index_width);
         uprintln!(opt, Stderr, None, 4, "    {:?}", channel);
 
+        let contact = get_contact_tuple(&channel, &codeplug);
         if channel.mode == ChannelMode::FM {
             writer.write_record(&[
                 channel.index.to_string(), // No.
@@ -583,8 +654,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 "A-Analog".to_string(), // Channel Type
                 write_power(&channel.power), // Transmit Power
                 match channel.fm.clone().unwrap().bandwidth.to_f64().unwrap() {
-                    12.5 => "12.5K".to_string(),
-                    25.0 => "25K".to_string(),
+                    12_500.0 => "12.5K".to_string(),
+                    25_000.0 => "25K".to_string(),
                     _ => return Err("Unrecognized bandwidth".into()),
                 }, // Band Width
                 if let Some(tone) = &channel.fm.as_ref().unwrap().tone_rx {
@@ -603,11 +674,11 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 } else {
                     "Off".to_string()
                 }, // CTCSS/DCS Encode
-                "".to_string(), // Contact
-                "".to_string(), // Contact Call Type
-                "".to_string(), // Contact TG/DMR ID
-                "".to_string(), // Radio ID
-                "".to_string(), // Busy Lock/TX Permit
+                contact.0, // Contact
+                contact.1, // Contact Call Type
+                contact.2, // Contact TG/DMR ID
+                write_radio_id(&channel, &codeplug), // Radio ID
+                write_tx_permit(&channel), // Busy Lock/TX Permit
                 if channel.fm.as_ref().unwrap().tone_rx.is_some() {
                     "CTCSS/DCS".to_string()
                 } else {
@@ -618,9 +689,9 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 "1".to_string(), // 2Tone ID
                 "1".to_string(), // 5Tone ID
                 "Off".to_string(), // PTT ID
-                "0".to_string(), // Color Code
+                "1".to_string(), // Color Code
                 "1".to_string(), // Slot
-                "None".to_string(), // Scan List
+                write_scan_list(&channel, &codeplug), // Scan List
                 "None".to_string(), // Receive Group List
                 if channel.rx_only {
                     "On".to_string()
@@ -648,23 +719,23 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
                 "D-Digital".to_string(), // Channel Type
                 write_power(&channel.power), // Transmit Power
-                "".to_string(), // Band Width
-                "".to_string(), // CTCSS/DCS Decode
-                "".to_string(), // CTCSS/DCS Encode
-                write_contact(&channel, &codeplug), // Contact
-                "Group Call".to_string(), // Contact Call Type
-                "".to_string(), // Contact TG/DMR ID
-                "".to_string(), // Radio ID
-                "".to_string(), // Busy Lock/TX Permit
-                "".to_string(), // Squelch Mode
-                "".to_string(), // Optional Signal
+                "12.5K".to_string(), // Band Width
+                "Off".to_string(), // CTCSS/DCS Decode
+                "Off".to_string(), // CTCSS/DCS Encode
+                contact.0, // Contact
+                contact.1, // Contact Call Type
+                contact.2, // Contact TG/DMR ID
+                write_radio_id(&channel, &codeplug), // Radio ID
+                write_tx_permit(&channel), // Busy Lock/TX Permit
+                "Carrier".to_string(), // Squelch Mode
+                "Off".to_string(), // Optional Signal
                 "1".to_string(), // DTMF ID
                 "1".to_string(), // 2Tone ID
                 "1".to_string(), // 5Tone ID
                 "Off".to_string(), // PTT ID
                 channel.dmr.as_ref().unwrap().color_code.to_string(), // Color Code
                 channel.dmr.as_ref().unwrap().timeslot.to_string(), // Slot
-                "None".to_string(), // Scan List
+                write_scan_list(&channel, &codeplug), // Scan List
                 if let Some(talkgroup_list) = &channel.dmr.as_ref().unwrap().talkgroup_list {
                     talkgroup_list.clone()
                 } else {
@@ -755,7 +826,7 @@ pub fn write_scanlists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result
 
     // write the header
     writer.write_record(&[
-        "No",
+        "No.",
         "Scan List Name",
         "Scan Channel Member",
         "Scan Mode",
@@ -789,10 +860,39 @@ pub fn write_scanlists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result
             "Off".to_string(), // Priority Channel 1
             "Off".to_string(), // Priority Channel 2
             "Selected".to_string(), // Revert Channel
-            "2".to_string(), // Look Back Time A[s]
-            "3".to_string(), // Look Back Time B[s]
+            "2.0".to_string(), // Look Back Time A[s]
+            "3.0".to_string(), // Look Back Time B[s]
             "3.1".to_string(), // Dropout Delay Time[s]
             "3.1".to_string(), // Dwell Time[s]
+        ])?;
+    }
+
+    writer.flush()?;
+    Ok(())
+}
+
+pub fn write_radio_id_list(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
+
+    let mut writer = csv::WriterBuilder::new()
+        .quote_style(csv::QuoteStyle::Always) // Anytone CPS expects all fields to be quoted
+        .terminator(csv::Terminator::CRLF)
+        .from_path(path)?;
+
+    // write the header
+    writer.write_record(&[
+        "No.",
+        "Radio ID",
+        "Name",
+    ])?;
+
+    for (ii, dmr_id) in codeplug.config.as_ref().unwrap().dmr_configuration.as_ref().unwrap().id_list.iter().enumerate() {
+        uprintln!(opt, Stderr, None, 4, "Writing radio ID {:width$}: {}", dmr_id.id, dmr_id.name, width = 8);
+        writer.write_record(&[
+            format!("{}", ii + 1), // No.
+            dmr_id.id.to_string(), // Radio ID
+            dmr_id.name.clone(), // Name
         ])?;
     }
 
@@ -856,6 +956,17 @@ pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<()
     scanlists_path.push("ScanList.CSV");
     if codeplug.zones.len() > 0 {
         write_scanlists(&codeplug, &scanlists_path, &opt)?;
+    }
+
+    // write to RadioIDList.CSV
+    let mut radio_id_list_path: PathBuf = output_path.clone();
+    radio_id_list_path.push("RadioIDList.CSV");
+    if let Some(config) = &codeplug.config {
+        if let Some(dmr_config) = &config.dmr_configuration {
+            if dmr_config.id_list.len() > 0 {
+                write_radio_id_list(codeplug, &radio_id_list_path, opt)?;
+            }
+        }
     }
 
     Ok(())

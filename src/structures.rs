@@ -49,6 +49,7 @@ pub struct DmrChannel {
     pub color_code: u8,
     pub talkgroup: Option<String>,
     pub talkgroup_list: Option<String>,
+    pub id_name: Option<String>,
 }
 
 /// Timeout
@@ -63,6 +64,17 @@ pub struct Timeout {
 pub struct Power {
     pub default: bool,
     pub watts: Option<rust_decimal::Decimal>,
+}
+
+/// Tx Permit
+// aka TX Admit, TX Authority, TX Inhibit
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub enum TxPermit {
+    Always,
+    ChannelFree,
+    CtcssDcsDifferent,
+    ColorCodeSame,
+    ColorCodeDifferent,
 }
 
 /// Scan
@@ -83,6 +95,7 @@ pub struct Channel {
     pub rx_only: bool,
     pub tx_tot: Timeout,
     pub power: Power,
+    pub tx_permit: Option<TxPermit>,
     pub scan: Option<Scan>,
     // mode-specific properties
     pub fm: Option<FmChannel>,
