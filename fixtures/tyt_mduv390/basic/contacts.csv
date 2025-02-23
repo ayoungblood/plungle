@@ -1,0 +1,13 @@
+Contact Name,Call Type,Call ID,Call Receive Tone
+LOCAL 2,1,2,0
+LOCAL 9,1,9,0
+505 RM NM,1,505,0
+700 RM Wide,1,700,0
+705 RM Eastern,1,705,0
+91 BM World,1,91,0
+93 BM NA,1,93,0
+BM KC Wide,1,313136,0
+4000 Disconnect,1,4000,0
+ALL CALL,3,16777215,0
+Private 12345,2,12345,0
+33 RX Tone,1,33,1

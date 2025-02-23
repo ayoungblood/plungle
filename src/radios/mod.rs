@@ -16,6 +16,7 @@ mod opengd77_rt3s;
 mod chirp_generic;
 mod ailunce_hd1;
 mod alinco_djmd5t;
+mod tyt_mduv390;
 
 pub fn parse_codeplug(model: &String, input: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
@@ -27,6 +28,7 @@ pub fn parse_codeplug(model: &String, input: &PathBuf, opt: &Opt) -> Result<Code
     read_functions.insert("chirp_generic", chirp_generic::read);
     read_functions.insert("ailunce_hd1", ailunce_hd1::read);
     read_functions.insert("alinco_djmd5t", alinco_djmd5t::read);
+    read_functions.insert("tyt_mduv390", tyt_mduv390::read);
 
     // look up the radio model in the hashmap
     if let Some(read_function) = read_functions.get(model.as_str()) {
@@ -51,6 +53,7 @@ pub fn generate_codeplug(codeplug: &Codeplug, model: &String, output: &PathBuf, 
     write_functions.insert("chirp_generic", chirp_generic::write);
     write_functions.insert("ailunce_hd1", ailunce_hd1::write);
     write_functions.insert("alinco_djmd5t", alinco_djmd5t::write);
+    write_functions.insert("tyt_mduv390", tyt_mduv390::write);
 
     // look up the radio model in the hashmap
     if let Some(write_function) = write_functions.get(model.as_str()) {
@@ -75,6 +78,7 @@ pub fn get_properties(model: &String, opt: &Opt) -> Result<structures::RadioProp
     properties_functions.insert("chirp_generic", chirp_generic::get_props);
     properties_functions.insert("ailunce_hd1", ailunce_hd1::get_props);
     properties_functions.insert("alinco_djmd5t", alinco_djmd5t::get_props);
+    properties_functions.insert("tyt_mduv390", tyt_mduv390::get_props);
 
     // look up the radio model in the hashmap
     if let Some(properties_function) = properties_functions.get(model.as_str()) {
