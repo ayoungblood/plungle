@@ -53,6 +53,7 @@ Complete documentation is not yet written.
 * Retevis RT3S running OpenGD77
 * Alinco DJ-MD5TGP (other DJ-MD5x radios are untested but may work)
 * Ailunce HD1 (support is very poor due to limitations of the HD1 CPS)
+* TYT MD-UV390 (support is very poor due to limitations of the MD-UV390 CPS)
 
 ## Future Plans
 
@@ -65,7 +66,7 @@ Future features that may eventually be added include:
 * Batch editing operations
 * Support for Motorola XPR 7550/e (VHF/UHF)
 * Support for Motorola XPR 6550 (VHF/UHF)
-* Support for Retevis RT3S on stock firmware, and TYT MD-UV380/MD-UV390 on both stock and OpenGD77 firmware
+* Support for Retevis RT3S on stock firmware, and TYT MD-UV380/MD-UV390 on OpenGD77 firmware
 * Support for Yaesu FT-3D
 * Support for multiple DMR IDs
 * Improved support for scanlists
