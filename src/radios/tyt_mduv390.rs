@@ -41,58 +41,51 @@ pub fn get_props() -> &'static structures::RadioProperties {
 // - RX Frequency(MHz): unpadded
 // - TX Frequency(MHz): unpadded
 // - Band Width: 2 for 25kHz, 1 for 20kHz, 0 for 12.5kHz
-// - Scan List: zero-index
-// - Squelch: [?-?], default 1
+// - Scan List: 0=None, else one-index
+// - Squelch: [0-9], default 1
 // - RX Ref Frequency: default 0
 // - TX Ref Frequency: default 0
-// - TOT[s]: seconds/15, default 4
+// - TOT[s]: seconds/15, default 4, 0 = infinite
 // - TOT Rekey Delay[s]: default 0
-// - Power: 0,1,2 for low, mid, high
-// - Admit Criteria:
-// - Auto Scan
-// - Rx Only
-// - Lone Worker
-// - VOX
-// - Allow Talkaround
-// - Send GPS Info
-// - Receive GPS Info
-// - Private Call Confirmed
-// - Emergency Alarm Ack
-// - Data Call Confirmed
-// - Allow Interrupt
-// - DCDCM Switch
-// - Leader/MS
-// - Emergency System
-// - Contact Name
-// - Group List
-// - Color Code
-// - Repeater Slot
-// - In Call Criteria
-// - Privacy
-// - Privacy No.
-// - GPS System
-// - CTCSS/DCS Dec
-// - CTCSS/DCS Enc
-// - RX Signaling System
-// - Tx Signaling System
-// - QT Reverse
-// - Non-QT/DQT Turn-off Freq
-// - Display PTT ID
-// - Reverse Burst/Turn-off Code
-// - Decode 1
-// - Decode 2
-// - Decode 3
-// - Decode 4
-// - Decode 5
-// - Decode 6
-// - Decode 7
-// - Decode 8
+// - Power: 0,1,2 for Low, Middle, High
+// - Admit Criteria: [0,1,2] for analog (Always, Channel Free, Correct CTCSS/DCS), [0,1,2] for DMR (Always, Channel Free, Color Code)
+// - Auto Scan: default 0
+// - Rx Only: [0,1] = [off, on], default 0
+// - Lone Worker: default 0
+// - VOX: default 0
+// - Allow Talkaround: [0,1] = [off, on], default 0
+// - Send GPS Info: default 0
+// - Receive GPS Info: default 0
+// - Private Call Confirmed: default 0
+// - Emergency Alarm Ack: default 0
+// - Data Call Confirmed: default 0
+// - Allow Interrupt: default 0
+// - DCDCM Switch: default 0
+// - Leader/MS: default 1
+// - Emergency System: default 0
+// - Contact Name: 0 for analog channels, index for DMR channels
+// - Group List: 0 for analog channels, index for DMR channels
+// - Color Code: [0-15], 1 for analog channels
+// - Repeater Slot: [0,1], default 0
+// - In Call Criteria: default 0
+// - Privacy: default 0
+// - Privacy No.: default 0
+// - GPS System: default 0
+// - CTCSS/DCS Dec: [None,67.0-254.1,D023N,D754I]
+// - CTCSS/DCS Enc: [None,67.0-254.1,D023N,D754I]
+// - RX Signaling System: default 0
+// - Tx Signaling System: default 0
+// - QT Reverse: default 0
+// - Non-QT/DQT Turn-off Freq: default 2
+// - Display PTT ID: default 1
+// - Reverse Burst/Turn-off Code: default 1
+// - Decode 1 thru Decode 8: default 0
 
 // contacts.csv
-// - Contact Name
-// - Call Type
-// - Call ID
-// - Call Receive Tone
+// - Contact Name: 16 characters max
+// - Call Type: [1,2,3] for [Group, Private, AllCall]
+// - Call ID: talkgroup/contact ID
+// - Call Receive Tone: default 0, 1 = on
 
 type CsvRecord = HashMap<String, String>;
 
