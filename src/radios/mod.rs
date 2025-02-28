@@ -13,6 +13,7 @@ mod chirp_generic;
 mod ailunce_hd1;
 mod alinco_djmd5t;
 mod tyt_mduv390;
+mod motorola_xpr7550;
 
 pub fn parse_codeplug(opt: &Opt, model: &String, input: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
@@ -25,6 +26,7 @@ pub fn parse_codeplug(opt: &Opt, model: &String, input: &PathBuf) -> Result<Code
     read_functions.insert("ailunce_hd1", ailunce_hd1::read);
     read_functions.insert("alinco_djmd5t", alinco_djmd5t::read);
     read_functions.insert("tyt_mduv390", tyt_mduv390::read);
+    read_functions.insert("motorola_xpr7550", motorola_xpr7550::read);
 
     // look up the radio model in the hashmap
     if let Some(read_function) = read_functions.get(model.as_str()) {
