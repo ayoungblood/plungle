@@ -4,6 +4,7 @@ mod ailunce_hd1;
 mod alinco_djmd5t;
 mod anytone_x78;
 mod chirp_generic;
+mod motorola_xpr7550;
 mod opengd77_rt3s;
 mod tyt_mduv390;
 
@@ -22,6 +23,7 @@ pub fn parse_codeplug(opt: &Opt, model: &String, input: &PathBuf) -> Result<Code
     read_functions.insert("alinco_djmd5t", alinco_djmd5t::read);
     read_functions.insert("anytone_x78", anytone_x78::read);
     read_functions.insert("chirp_generic", chirp_generic::read);
+    read_functions.insert("motorola_xpr7550", motorola_xpr7550::read);
     read_functions.insert("opengd77_rt3s", opengd77_rt3s::read);
     read_functions.insert("tyt_mduv390", tyt_mduv390::read);
 
