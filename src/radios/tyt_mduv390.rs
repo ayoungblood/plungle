@@ -1,13 +1,13 @@
 // src/radios/tyt_mduv390.rs
 
-use std::error:Error;
+use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 use std::path::Path;
 use std::collections::HashMap;
-use rust_decimal::prelude::*;
+//use rust_decimal::prelude::*;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::*;
 use crate::structures::*;
@@ -97,9 +97,9 @@ fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup,
         id: record.get("Call ID").unwrap().parse::<u32>()?,
         name: record.get("Contact Name").unwrap().to_string(),
         call_type: match record.get("Call Type").unwrap().as_str() {
-            "Group" => DmrTalkgroupCallType::Group,
-            "Private" => DmrTalkgroupCallType::Private,
-            "AllCall" => DmrTalkgroupCallType::AllCall,
+            "1" => DmrTalkgroupCallType::Group,
+            "2" => DmrTalkgroupCallType::Private,
+            "3" => DmrTalkgroupCallType::AllCall,
             _ => return Err(format!("Unrecognized call type: {}", record.get("Call Type").unwrap()).into()),
         },
     };
@@ -112,9 +112,14 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
 
     // shared fields
     // there is no index in the CSV, so we have to generate it from a counter
-    static CHANNEL_COUNTER: AtomicUsize = AtomicUsize::new(1);
+    static CHANNEL_COUNTER: AtomicU32 = AtomicU32::new(1);
     channel.index = CHANNEL_COUNTER.fetch_add(1, Ordering::SeqCst);
     channel.name = record.get("Channel Name").unwrap().to_string();
+    channel.mode = match record.get("Channel Mode").unwrap().as_str() {
+        "1" => ChannelMode::FM,
+        "2" => ChannelMode::DMR,
+        _ => return Err(format!("Unrecognized channel mode: {}", record.get("Channel Mode").unwrap()).into()),
+    };
     Ok(channel)
 }
 
@@ -149,9 +154,9 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CsvRecord to Contact struct
-            let contact = parse_talkgroup_record(&record, &opt)?;
+            let talkgroup = parse_talkgroup_record(&record, &opt)?;
             // append to codeplug.contacts
-            codeplug.contacts.push(contact);
+            codeplug.talkgroups.push(talkgroup);
         }
     }
 
