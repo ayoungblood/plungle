@@ -32,8 +32,8 @@ pub fn parse_codeplug(model: &String, input: &PathBuf, opt: &Opt) -> Result<Code
     if let Some(read_function) = read_functions.get(model.as_str()) {
         return read_function(input, opt);
     } else {
-        uprintln!(opt, Stderr, Color::Red, None, "Unsupported radio model for operation: read");
-        uprintln!(opt, Stderr, None, None, "Operation \"read\" supports the following radio models:");
+        uprintln!(opt, Stderr, Color::Red, None, "Unsupported radio model for operation: parse");
+        uprintln!(opt, Stderr, None, None, "Operation \"parse\" supports the following radio models:");
         for (kk, _) in read_functions.iter() {
             uprintln!(opt, Stderr, None, None, "    {}", kk);
         }

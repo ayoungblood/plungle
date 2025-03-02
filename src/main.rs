@@ -15,6 +15,7 @@ mod radios;
 mod structures;
 mod validate;
 mod bandplan;
+mod printer;
 
 #[derive(Debug, Parser)]
 #[clap(version, author, about = "Codeplug conversion tool")]
@@ -113,6 +114,7 @@ fn write_codeplug(output_path: &Option<PathBuf>, codeplug: &structures::Codeplug
                     match ext.to_str().unwrap() {
                         "json" => helpers::Format::Json,
                         "toml" => helpers::Format::Toml,
+                        "txt" => helpers::Format::Text,
                         _ => opt.format.clone(),
                     }
                 }
@@ -125,6 +127,7 @@ fn write_codeplug(output_path: &Option<PathBuf>, codeplug: &structures::Codeplug
     let file_str = match format {
         helpers::Format::Json => serde_json::to_string_pretty(codeplug)?,
         helpers::Format::Toml => toml::to_string_pretty(codeplug)?,
+        helpers::Format::Text => printer::pretty(opt, codeplug)?,
     };
 
     // write to file or stdout

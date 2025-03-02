@@ -9,6 +9,7 @@ pub enum Format {
     #[default]
     Json,
     Toml,
+    Text,
 }
 
 #[derive(Debug)]
