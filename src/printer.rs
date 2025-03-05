@@ -81,7 +81,7 @@ fn pretty_channel(_opt: &Opt, channel: &Channel) -> String {
             format!("rx={:5}", pretty_tone(&channel.fm.clone().unwrap().tone_rx)),
             format!("tx={:5}", pretty_tone(&channel.fm.clone().unwrap().tone_tx)),
         )),
-        ChannelMode::DMR => line.push_str(&format!("slot={:1} color={:2} tg={} tgl={} id={}",
+        ChannelMode::DMR => line.push_str(&format!("slot={:1} color={:2} tg={:16} tgl={:16} id={}",
             channel.dmr.clone().unwrap().timeslot,
             channel.dmr.clone().unwrap().color_code,
             if channel.dmr.clone().unwrap().talkgroup.is_some() {
