@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::path::Path;
 use std::collections::HashMap;
-//use rust_decimal::prelude::*;
+use rust_decimal::prelude::*;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -106,7 +106,40 @@ fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup,
     Ok(talkgroup)
 }
 
-fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
+fn parse_tone(tone: &str) -> Option<Tone> {
+    if tone == "None" {
+        return None;
+    }
+    // if string begins with D, it's a DCS code
+    if tone.starts_with("D") {
+        return Some(Tone {
+            mode: ToneMode::DCS,
+            ctcss: None,
+            dcs: Some(tone.to_string()),
+        });
+    }
+    Some(Tone {
+        mode: ToneMode::CTCSS,
+        ctcss: Some(Decimal::from_str(tone).unwrap()),
+        dcs: None,
+    })
+}
+
+fn get_talkgroup_by_index(index: u32, codeplug: &Codeplug) -> Option<String> {
+    // get the nth talkgroup from the codeplug
+    // if index is 0, return None
+    if index == 0 {
+        return None;
+    }
+    // if index is greater than the number of talkgroups, return None
+    if index > codeplug.talkgroups.len() as u32 {
+        return None;
+    }
+    // return the talkgroup at index - 1 (since the CSV is 1-indexed)
+    Some(codeplug.talkgroups[index as usize - 1].name.clone())
+}
+
+fn parse_channel_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     let mut channel = Channel::default();
 
@@ -120,6 +153,52 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
         "2" => ChannelMode::DMR,
         _ => return Err(format!("Unrecognized channel mode: {}", record.get("Channel Mode").unwrap()).into()),
     };
+    channel.frequency_rx = Decimal::from_str(record.get("RX Frequency(MHz)").unwrap().trim())? * Decimal::new(1_000_000, 0);
+    channel.frequency_tx = Decimal::from_str(record.get("TX Frequency(MHz)").unwrap().trim())? * Decimal::new(1_000_000, 0);
+    channel.rx_only = record.get("Rx Only").unwrap().as_str() == "1";
+    channel.tx_tot = match record.get("TOT[s]").unwrap().as_str() {
+        "0" => Timeout { default: true, seconds: None },
+        s => Timeout { default: false, seconds: Some(s.parse::<u32>()? * 15) },
+    };
+    channel.power = match record.get("Power").unwrap().as_str() {
+        "0" => Power { default: false, watts: Some(Decimal::new( 1, 0)) }, // Low
+        "1" => Power { default: false, watts: Some(Decimal::new(25, 1)) }, // Middle
+        "2" => Power { default: false, watts: Some(Decimal::new( 5, 0)) }, // High
+        _ => return Err(format!("Unrecognized power level: {}", record.get("Power").unwrap()).into()),
+    };
+    // mode specific fields
+    match channel.mode {
+        ChannelMode::FM => {
+            channel.fm = Some(FmChannel {
+                bandwidth: match record.get("Band Width").unwrap().as_str() {
+                    "2" => Decimal::new(25_000, 0), // 25kHz
+                    "1" => Decimal::new(20_000, 0), // 20kHz
+                    "0" => Decimal::new(12_500, 0), // 12.5kHz
+                    _ => return Err(format!("Unrecognized bandwidth: {}", record.get("Band Width").unwrap()).into()),
+                },
+                squelch: Squelch {
+                    default: false,
+                    percent: Some(record.get("Squelch").unwrap().parse::<u8>()? * 10),
+                },
+                tone_rx: parse_tone(record.get("CTCSS/DCS Dec").unwrap().trim()),
+                tone_tx: parse_tone(record.get("CTCSS/DCS Enc").unwrap().trim()),
+            });
+        }
+        ChannelMode::DMR => {
+            channel.dmr = Some(DmrChannel {
+                timeslot: record.get("Repeater Slot").unwrap().parse::<u8>()? + 1,
+                color_code: record.get("Color Code").unwrap().parse::<u8>()?,
+                talkgroup: get_talkgroup_by_index(
+                    record.get("Contact Name").unwrap().parse::<u32>()?,
+                    &codeplug,
+                ),
+                talkgroup_list: None, // CPS does not export talkgroup lists
+                id_name: None,
+            });
+        }
+        _ => {}
+    }
+
     Ok(channel)
 }
 
@@ -182,10 +261,220 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
     for result in reader.deserialize() {
         let record: CsvRecord = result?;
         // convert from CsvRecord to Channel struct
-        let channel = parse_channel_record(&record, &opt)?;
+        let channel = parse_channel_record(&record, &codeplug, &opt)?;
         // append to codeplug.channels
         codeplug.channels.push(channel);
     }
 
     Ok(codeplug)
+}
+
+// WRITE //////////////////////////////////////////////////////////////////////
+
+fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    // write contacts.csv
+    let mut writer = csv::WriterBuilder::new()
+        .from_path(path)?;
+
+    // write the header
+    writer.write_record(&[
+        "Contact Name",
+        "Call Type",
+        "Call ID",
+        "Call Receive Tone",
+    ])?;
+
+    for talkgroup in &codeplug.talkgroups {
+        uprintln!(opt, Stderr, None, 4, "Writing talkgroup: {}", talkgroup.name);
+        writer.write_record(&[
+            talkgroup.name.clone(), // Contact Name
+            match talkgroup.call_type {
+                DmrTalkgroupCallType::Group => "1".to_string(),
+                DmrTalkgroupCallType::Private => "2".to_string(),
+                DmrTalkgroupCallType::AllCall => "3".to_string(),
+            },
+            talkgroup.id.to_string(), // Call ID
+            "0".to_string(), // Call Receive Tone (unsupported)
+        ])?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    // write channels.csv
+    let mut writer = csv::WriterBuilder::new()
+        .from_path(path)?;
+
+    // write the header
+    writer.write_record(&[
+        "Channel Mode",
+        "Channel Name",
+        "RX Frequency(MHz)",
+        "TX Frequency(MHz)",
+        "Band Width",
+        "Scan List",
+        "Squelch",
+        "RX Ref Frequency",
+        "TX Ref Frequency",
+        "TOT[s]",
+        "TOT Rekey Delay[s]",
+        "Power",
+        "Admit Criteria",
+        "Auto Scan",
+        "Rx Only",
+        "Lone Worker",
+        "VOX",
+        "Allow Talkaround",
+        "Send GPS Info",
+        "Receive GPS Info",
+        "Private Call Confirmed",
+        "Emergency Alarm Ack",
+        "Data Call Confirmed",
+        "Allow Interrupt",
+        "DCDCM Switch",
+        "Leader/MS",
+        "Emergency System",
+        "Contact Name",
+        "Group List",
+        "Color Code",
+        "Repeater Slot",
+        "In Call Criteria",
+        "Privacy",
+        "Privacy No.",
+        "GPS System",
+        "CTCSS/DCS Dec",
+        "CTCSS/DCS Enc",
+        "RX Signaling System",
+        "Tx Signaling System",
+        "QT Reverse",
+        "Non-QT/DQT Turn-off Freq",
+        "Display PTT ID",
+        "Reverse Burst/Turn-off Code",
+        "Decode 1",
+        "Decode 2",
+        "Decode 3",
+        "Decode 4",
+        "Decode 5",
+        "Decode 6",
+        "Decode 7",
+        "Decode 8",
+    ])?;
+
+    for channel in &codeplug.channels {
+        uprintln!(opt, Stderr, None, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width = get_props().channel_index_width);
+        if channel.mode == ChannelMode::FM {
+            writer.write_record(&[
+                "1".to_string(), // Channel Mode
+                channel.name.clone(), // Channel Name
+                format!("{:.5}", channel.frequency_rx / Decimal::new(1_000_000, 0)), // RX Frequency(MHz)
+                format!("{:.5}", channel.frequency_tx / Decimal::new(1_000_000, 0)), // TX Frequency(MHz)
+                match channel.fm.as_ref().unwrap().bandwidth {
+                    bw if bw == Decimal::new(25_000, 0) => "2".to_string(), // 25kHz
+                    bw if bw == Decimal::new(20_000, 0) => "1".to_string(), // 20kHz
+                    bw if bw == Decimal::new(12_500, 0) => "0".to_string(), // 12.5kHz
+                    _ => return Err("Unrecognized bandwidth".into()),
+                },
+                "0".to_string(), // Scan List
+                channel.fm.as_ref().unwrap().squelch.percent.unwrap_or(10).to_string(), // Squelch
+                "0".to_string(), // RX Ref Frequency
+                "0".to_string(), // TX Ref Frequency
+                channel.tx_tot.seconds.unwrap_or(4 * 15).to_string(), // TOT[s]
+                "0".to_string(), // TOT Rekey Delay[s]
+                match channel.power.watts.unwrap() {
+                    w if w == Decimal::new(1, 0) => "0".to_string(), // Low
+                    w if w == Decimal::new(25, 1) => "1".to_string(), // Middle
+                    w if w == Decimal::new(5, 0) => "2".to_string(), // High
+                    _ => return Err("Unrecognized power level".into()),
+                },
+                "0".to_string(), // Admit Criteria (Always)
+                "0".to_string(), // Auto Scan
+                if channel.rx_only { "1" } else { "0" }.to_string(), // Rx Only
+                "0".to_string(), // Lone Worker
+                "0".to_string(), // VOX
+                "0".to_string(), // Allow Talkaround
+                "0".to_string(), // Send GPS Info
+                "0".to_string(), // Receive GPS Info
+                "0".to_string(), // Private Call Confirmed
+                "0".to_string(), // Emergency Alarm Ack
+                "0".to_string(), // Data Call Confirmed
+                "0".to_string(), // Allow Interrupt
+                "0".to_string(), // DCDCM Switch
+                "1".to_string(), // Leader/MS
+                "0".to_string(), // Emergency System
+                "0".to_string(), // Contact Name
+                "0".to_string(), // Group List
+                "1".to_string(), // Color Code
+                "0".to_string(), // Repeater Slot
+                "0".to_string(), // In Call Criteria
+                "0".to_string(), // Privacy
+                "0".to_string(), // Privacy No.
+                "0".to_string(), // GPS System
+                "None".to_string(), // CTCSS/DCS Dec
+                "None".to_string(), // CTCSS/DCS Enc
+                "0".to_string(), // RX Signaling System
+                "0".to_string(), // Tx Signaling System
+                "0".to_string(), // QT Reverse
+                "2".to_string(), // Non-QT/DQT Turn-off Freq
+                "1".to_string(), // Display PTT ID
+                "1".to_string(), // Reverse Burst/Turn-off Code
+                "0".to_string(), // Decode 1
+                "0".to_string(), // Decode 2
+                "0".to_string(), // Decode 3
+                "0".to_string(), // Decode 4
+                "0".to_string(), // Decode 5
+                "0".to_string(), // Decode 6
+                "0".to_string(), // Decode 7
+                "0".to_string(), // Decode 8
+            ])?;
+        }
+    }
+
+    writer.flush()?;
+    Ok(())
+}
+
+pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    // if the output path exists, check if it is an empty directory
+    // if it does not exist, create it
+    if output_path.exists() {
+        if output_path.is_dir() {
+            // check if the directory is empty
+            let dir_entries = std::fs::read_dir(output_path)?;
+            if dir_entries.count() > 0 {
+                uprintln!(opt, Stderr, Color::Red, None, "Output path exists and is not empty, not overwriting!");
+                return Err("Bad output path".into());
+            }
+        }
+    } else {
+        // if it does not exist, create it
+        std::fs::create_dir_all(output_path)?;
+    }
+    if fs::metadata(output_path)?.permissions().readonly() {
+        uprintln!(opt, Stderr, Color::Red, None, "Output path is read-only, cannot write!");
+        return Err("Bad output path".into());
+    }
+
+    // write contacts.csv
+    let mut contacts_path = output_path.clone();
+    contacts_path.push("contacts.csv");
+    if codeplug.talkgroups.len() > 0 {
+        write_talkgroups(&codeplug, &contacts_path, opt)?;
+    }
+
+    // write channels.csv
+    let mut channels_path = output_path.clone();
+    channels_path.push("channels.csv");
+    write_channels(&codeplug, &channels_path, opt)?;
+
+    Ok(())
 }

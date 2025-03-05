@@ -53,6 +53,7 @@ pub fn generate_codeplug(codeplug: &Codeplug, model: &String, output: &PathBuf, 
     write_functions.insert("chirp_generic", chirp_generic::write);
     write_functions.insert("ailunce_hd1", ailunce_hd1::write);
     write_functions.insert("alinco_djmd5t", alinco_djmd5t::write);
+    write_functions.insert("tyt_mduv390", tyt_mduv390::write);
 
     // look up the radio model in the hashmap
     if let Some(write_function) = write_functions.get(model.as_str()) {
