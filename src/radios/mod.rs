@@ -76,6 +76,7 @@ pub fn get_properties(opt: &Opt, model: &String) -> Result<structures::RadioProp
     properties_functions.insert("chirp_generic", chirp_generic::get_props);
     properties_functions.insert("opengd77_rt3s", opengd77_rt3s::get_props);
     properties_functions.insert("tyt_mduv390", tyt_mduv390::get_props);
+    properties_functions.insert("motorola_xpr7550", motorola_xpr7550::get_props);
 
     // look up the radio model in the hashmap
     if let Some(properties_function) = properties_functions.get(model.as_str()) {
