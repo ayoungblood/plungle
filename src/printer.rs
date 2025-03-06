@@ -64,42 +64,46 @@ fn pretty_channel(_opt: &Opt, channel: &Channel) -> String {
     line.push_str(&format!("    "));
     line.push_str(&format!("{:width$} ", channel.index, width = 4));
     line.push_str(&format!("{:width$} ", channel.name, width = 16));
-    line.push_str(&format!("{}  ", channel.mode));
-    line.push_str(&format!("{} ", freq2str(&channel.frequency_rx)));
-    line.push_str(&format!("{} ", freq2str(&channel.frequency_tx)));
-    line.push_str(&format!("{} ", if channel.rx_only { "RXO" } else { "   " }));
-    line.push_str(&format!("{} ", channel.tx_tot));
-    line.push_str(&format!("{} ", channel.power));
+    line.push_str(&format!("{:4}  ", channel.mode));
+    line.push_str(&format!("{:12} ", freq2str(&channel.frequency_rx)));
+    line.push_str(&format!("{:12} ", freq2str(&channel.frequency_tx)));
+    line.push_str(&format!("{:3} ", if channel.rx_only { "RXO" } else { "   " }));
+    line.push_str(&format!("{:7} ", channel.tx_tot));
+    line.push_str(&format!("{:7} ", channel.power));
     line.push_str(&format!("{:7} ", pretty_tx_permit(&channel.tx_permit)));
     line.push_str(&format!("{:7} ", pretty_scan(&channel.scan)));
     // print mode specific stuff
     match channel.mode {
         ChannelMode::AM  => line.push_str(&format!(" ")),
-        ChannelMode::FM  => line.push_str(&format!("{} {} {} {}",
-            format!("bw={:4.1}k", &channel.fm.clone().unwrap().bandwidth.to_f64().unwrap()/1000.0),
-            format!("sq={:>4}", pretty_squelch(&channel.fm.clone().unwrap().squelch)),
-            format!("rx={:5}", pretty_tone(&channel.fm.clone().unwrap().tone_rx)),
-            format!("tx={:5}", pretty_tone(&channel.fm.clone().unwrap().tone_tx)),
-        )),
-        ChannelMode::DMR => line.push_str(&format!("slot={:1} color={:2} tg={} tgl={} id={}",
-            channel.dmr.clone().unwrap().timeslot,
-            channel.dmr.clone().unwrap().color_code,
-            if channel.dmr.clone().unwrap().talkgroup.is_some() {
-                channel.dmr.clone().unwrap().talkgroup.as_ref().unwrap().clone()
-            } else {
-                "".to_string()
-            },
-            if channel.dmr.clone().unwrap().talkgroup_list.is_some() {
-                channel.dmr.clone().unwrap().talkgroup_list.as_ref().unwrap().clone()
-            } else {
-                "".to_string()
-            },
-            if channel.dmr.clone().unwrap().id_name.is_some() {
-                channel.dmr.clone().unwrap().id_name.as_ref().unwrap().clone()
-            } else {
-                "".to_string()
-            },
-        )),
+        ChannelMode::FM  => if channel.fm.is_some() {
+            line.push_str(&format!("bw={:4.1}k sq={:>4} rxt={:5} txt={:5}",
+                &channel.fm.clone().unwrap().bandwidth.to_f64().unwrap()/1000.0,
+                pretty_squelch(&channel.fm.clone().unwrap().squelch),
+                pretty_tone(&channel.fm.clone().unwrap().tone_rx),
+                pretty_tone(&channel.fm.clone().unwrap().tone_tx),
+            ));
+        },
+        ChannelMode::DMR => if channel.dmr.is_some() {
+            line.push_str(&format!("slot={:1} color={:2} tg={} tgl={} id={}",
+                channel.dmr.clone().unwrap().timeslot,
+                channel.dmr.clone().unwrap().color_code,
+                if channel.dmr.clone().unwrap().talkgroup.is_some() {
+                    channel.dmr.clone().unwrap().talkgroup.as_ref().unwrap().clone()
+                } else {
+                    "".to_string()
+                },
+                if channel.dmr.clone().unwrap().talkgroup_list.is_some() {
+                    channel.dmr.clone().unwrap().talkgroup_list.as_ref().unwrap().clone()
+                } else {
+                    "".to_string()
+                },
+                if channel.dmr.clone().unwrap().id_name.is_some() {
+                    channel.dmr.clone().unwrap().id_name.as_ref().unwrap().clone()
+                } else {
+                    "".to_string()
+                },
+            ));
+        },
     }
     line
 }
