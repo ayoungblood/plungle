@@ -79,3 +79,17 @@ Based on V3.03 CPS
 * Max talkgroup name length: ??
 * Max talkgroup lists: 76
 * Max talkgroups per talkgroup list: 32
+
+### Motorola XPR7550/XPR7550e
+
+* TX Frequency: 136-174 MHz or 403-512 MHz or 806-941 MHz
+* Supported modes: FM, NFM, DMR
+* Max channels: 1000
+* Max channel name length: 16
+* Max zones: 250
+* Max zone name length: 16
+* Max channels per zone: 160
+* Max talkgroups: ??
+* Max talkgroup name length: ??
+* Max talkgroup lists: ??
+* Max talkgroups per talkgroup list: ??
