@@ -156,14 +156,15 @@ fn parse_channel_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> R
     channel.frequency_rx = Decimal::from_str(record.get("RX Frequency(MHz)").unwrap().trim())? * Decimal::new(1_000_000, 0);
     channel.frequency_tx = Decimal::from_str(record.get("TX Frequency(MHz)").unwrap().trim())? * Decimal::new(1_000_000, 0);
     channel.rx_only = record.get("Rx Only").unwrap().as_str() == "1";
-    channel.tx_tot = match record.get("TOT[s]").unwrap().as_str() {
-        "0" => Timeout { default: true, seconds: None },
-        s => Timeout { default: false, seconds: Some(s.parse::<u32>()? * 15) },
-    };
+    if record.get("TOT[s]").unwrap() == "0" {
+        channel.tx_tot = Timeout::Infinite;
+    } else {
+        channel.tx_tot = Timeout::Seconds(record.get("TOT[s]").unwrap().parse::<u32>()? * 15);
+    }
     channel.power = match record.get("Power").unwrap().as_str() {
-        "0" => Power { default: false, watts: Some(Decimal::new( 1, 0)) }, // Low
-        "1" => Power { default: false, watts: Some(Decimal::new(25, 1)) }, // Middle
-        "2" => Power { default: false, watts: Some(Decimal::new( 5, 0)) }, // High
+        "0" => Power::Watts(1.0), // Low
+        "1" => Power::Watts(2.5), // Middle
+        "2" => Power::Watts(5.0), // High
         _ => return Err(format!("Unrecognized power level: {}", record.get("Power").unwrap()).into()),
     };
     channel.tx_permit = match record.get("Admit Criteria").unwrap().as_str() {
@@ -324,14 +325,10 @@ fn write_squelch(squelch: &Squelch) -> String {
 }
 
 fn write_tx_tot(tx_tot: &Timeout) -> String {
-    if tx_tot.default {
-        "4".to_string()
-    } else {
-        if tx_tot.seconds.unwrap_or(4 * 15) == 0 {
-            "0".to_string()
-        } else {
-            (tx_tot.seconds.unwrap_or(4 * 15) / 15).to_string()
-        }
+    match tx_tot {
+        Timeout::Default => "4".to_string(),
+        Timeout::Seconds(s) => (s / 15).to_string(),
+        Timeout::Infinite => "0".to_string(),
     }
 }
 
@@ -371,6 +368,16 @@ fn write_contact(channel: &Channel, codeplug: &Codeplug) -> String {
 
 fn write_group_list(_channel: &Channel, _codeplug: &Codeplug) -> String {
     "0".to_string()
+}
+
+fn write_power(power: &Power) -> String {
+    match power {
+        Power::Default => "2".to_string(), // Default to High
+        Power::Watts(w) if *w >= 5.0 => "2".to_string(), // High
+        Power::Watts(w) if *w >= 2.5 => "1".to_string(), // Middle
+        Power::Watts(w) if *w >= 1.0 => "0".to_string(), // Low
+        _ => "0".to_string(),
+    }
 }
 
 fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
@@ -456,12 +463,7 @@ fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), 
                 "0".to_string(), // TX Ref Frequency
                 write_tx_tot(&channel.tx_tot), // TOT[s]
                 "0".to_string(), // TOT Rekey Delay[s]
-                match channel.power.watts.unwrap() {
-                    w if w == Decimal::new(1, 0) => "0".to_string(), // Low
-                    w if w == Decimal::new(25, 1) => "1".to_string(), // Middle
-                    w if w == Decimal::new(5, 0) => "2".to_string(), // High
-                    _ => return Err("Unrecognized power level".into()),
-                },
+                write_power(&channel.power), // Power
                 write_tx_permit(&channel.tx_permit), // Admit Criteria (Always)
                 "0".to_string(), // Auto Scan
                 if channel.rx_only { "1" } else { "0" }.to_string(), // Rx Only
@@ -515,12 +517,7 @@ fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), 
                 "0".to_string(), // TX Ref Frequency
                 write_tx_tot(&channel.tx_tot), // TOT[s]
                 "0".to_string(), // TOT Rekey Delay[s]
-                match channel.power.watts.unwrap() {
-                    w if w == Decimal::new(1, 0) => "0".to_string(), // Low
-                    w if w == Decimal::new(25, 1) => "1".to_string(), // Middle
-                    w if w == Decimal::new(5, 0) => "2".to_string(), // High
-                    _ => return Err("Unrecognized power level".into()),
-                },
+                write_power(&channel.power), // Power,
                 write_tx_permit(&channel.tx_permit), // Admit Criteria (Always)
                 "0".to_string(), // Auto Scan
                 if channel.rx_only { "1" } else { "0" }.to_string(), // Rx Only
