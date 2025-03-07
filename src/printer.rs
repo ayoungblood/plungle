@@ -5,20 +5,18 @@ use rust_decimal::prelude::ToPrimitive;
 use crate::*;
 use crate::structures::*;
 
+fn pretty_timeout(timeout: &Timeout) -> String {
+    match timeout {
+        Timeout::Default => "def ".to_string(),
+        Timeout::Seconds(s) => format!("{:3}s", s),
+        Timeout::Infinite => "inf ".to_string(),
+    }
+}
 
-fn pretty_tone(tone: &Option<Tone>) -> String {
-    if let Some(tone) = tone {
-        match tone.mode {
-            ToneMode::CTCSS => {
-                let freq = tone.ctcss.unwrap().to_f64().unwrap();
-                return format!("{:5.1}", freq);
-            },
-            ToneMode::DCS   => {
-                return format!("{}", tone.dcs.as_ref().unwrap());
-            },
-        }
-    } else {
-        return "none".to_string();
+fn pretty_power(power: &Power) -> String {
+    match power {
+        Power::Default => "def ".to_string(),
+        Power::Watts(w) => format!("{:4.1}W", w),
     }
 }
 
@@ -58,18 +56,34 @@ fn pretty_squelch(squelch: &Squelch) -> String {
     }
 }
 
+fn pretty_tone(tone: &Option<Tone>) -> String {
+    if let Some(tone) = tone {
+        match tone.mode {
+            ToneMode::CTCSS => {
+                let freq = tone.ctcss.unwrap().to_f64().unwrap();
+                return format!("{:5.1}", freq);
+            },
+            ToneMode::DCS   => {
+                return format!("{}", tone.dcs.as_ref().unwrap());
+            },
+        }
+    } else {
+        return "none".to_string();
+    }
+}
+
 fn pretty_channel(_opt: &Opt, channel: &Channel) -> String {
     let mut line = String::new();
     // print common stuff
     line.push_str(&format!("    "));
-    line.push_str(&format!("{:width$} ", channel.index, width = 4));
-    line.push_str(&format!("{:width$} ", channel.name, width = 16));
-    line.push_str(&format!("{}  ", channel.mode));
-    line.push_str(&format!("{} ", freq2str(&channel.frequency_rx)));
-    line.push_str(&format!("{} ", freq2str(&channel.frequency_tx)));
-    line.push_str(&format!("{} ", if channel.rx_only { "RXO" } else { "   " }));
-    line.push_str(&format!("{} ", channel.tx_tot));
-    line.push_str(&format!("{} ", channel.power));
+    line.push_str(&format!("{:4} ", channel.index));
+    line.push_str(&format!("{:16} ", channel.name));
+    line.push_str(&format!("{:4} ", format!("{:?}",channel.mode)));
+    line.push_str(&format!("{:12} ", freq2str(&channel.frequency_rx)));
+    line.push_str(&format!("{:12} ", freq2str(&channel.frequency_tx)));
+    line.push_str(&format!("{:3} ", if channel.rx_only { "RXO" } else { "   " }));
+    line.push_str(&format!("{:4} ", pretty_timeout(&channel.tx_tot)));
+    line.push_str(&format!("{:5} ", pretty_power(&channel.power)));
     line.push_str(&format!("{:7} ", pretty_tx_permit(&channel.tx_permit)));
     line.push_str(&format!("{:7} ", pretty_scan(&channel.scan)));
     // print mode specific stuff
@@ -109,7 +123,7 @@ fn print_channels(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Erro
 
     let mut output = String::new();
     output.push_str(&format!("Channels\n"));
-    output.push_str(&format!("    {:4} {:16} {:4} {:12} {:12} {:3} {:7} {:7} {:7} {:7}\n",
+    output.push_str(&format!("    {:4} {:16} {:4} {:12} {:12} {:3} {:4} {:5} {:7} {:7}\n",
         "no", "name", "mode", "rxf", "txf", "rxo", "tot", "power", "txprmit", "scan"));
     for channel in &codeplug.channels {
         output.push_str(&pretty_channel(opt, channel));

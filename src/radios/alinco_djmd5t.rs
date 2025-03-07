@@ -218,10 +218,11 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
     channel.frequency_tx = Decimal::from_str(record.get("Transmit Frequency").unwrap())? * Decimal::new(1_000_000, 0);
     channel.rx_only = record.get("TX Prohibit").unwrap() == "On";
     channel.power = match record.get("Transmit Power").unwrap().as_str() {
-        "Turbo" => Power {default: false, watts: Some(Decimal::new(7, 0))}, // 7W
-        "High" => Power {default: false, watts: Some(Decimal::new(5, 0))}, // 5W
-        "Mid" => Power {default: false, watts: Some(Decimal::new(25, 1))}, // 2.5W
-        "Low" => Power {default: false, watts: Some(Decimal::new(1, 0))}, // 1W
+        // @TODO manual disagrees with CPS, no idea what these values are
+        "Turbo" => Power::Watts(7.0), // 7W
+        "High" => Power::Watts(5.0), // 5W
+        "Mid" => Power::Watts(2.5), // 2.5W
+        "Low" => Power::Watts(1.0), // 1W
         _ => return Err(format!("Unrecognized power: {}", record.get("Transmit Power").unwrap()).into()),
     };
     channel.tx_permit = parse_tx_permit(record.get("Busy Lock/TX Permit").unwrap().as_str());
@@ -494,20 +495,13 @@ pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> 
 }
 
 fn write_power(power: &Power) -> String {
-    if power.default { // default to 5W
-        "High".to_string()
-    } else {
-        if power.watts >= Some(Decimal::new(7, 0)) {
-            "Turbo".to_string()
-        } else if power.watts >= Some(Decimal::new(5, 0)) {
-            "High".to_string()
-        } else if power.watts >= Some(Decimal::new(25, 1)) {
-            "Mid".to_string()
-        } else if power.watts >= Some(Decimal::new(1, 0)) {
-            "Low".to_string()
-        } else {
-            "Low".to_string()
-        }
+    match power {
+        Power::Default => "High".to_string(),
+        Power::Watts(w) if *w >= 7.0 => "Turbo".to_string(),
+        Power::Watts(w) if *w >= 5.0 => "High".to_string(),
+        Power::Watts(w) if *w >= 2.5 => "Mid".to_string(),
+        Power::Watts(w) if *w >= 1.0 => "Low".to_string(),
+        _ => "Low".to_string(),
     }
 }
 
