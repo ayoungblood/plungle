@@ -68,11 +68,7 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
     if tone_mode == "" {
         Ok((None, None))
     } else if tone_mode == "Tone" { // rx is carrier squelch, tx is CTCSS (rTone)
-        let tone_tx = Tone {
-            mode: ToneMode::CTCSS,
-            ctcss: Some(Decimal::from_str(record.get("rToneFreq").unwrap()).unwrap()),
-            dcs: None,
-        };
+        let tone_tx = Tone::Ctcss(record.get("rToneFreq").unwrap().parse::<f64>()?);
         Ok((None, Some(tone_tx)))
     } else if tone_mode == "TSQL" { // rx is CTCSS (cTone or rTone), tx is same CTCSS
         let tstr = if record.get("cToneFreq").unwrap() == "" {
@@ -80,11 +76,7 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
         } else {
             record.get("cToneFreq").unwrap()
         };
-        let tone = Tone {
-            mode: ToneMode::CTCSS,
-            ctcss: Some(Decimal::from_str(tstr).unwrap()),
-            dcs: None,
-        };
+        let tone = Tone::Ctcss(tstr.parse::<f64>()?);
         Ok((Some(tone.clone()), Some(tone)))
     } else if tone_mode == "DTCS" { // rx is DCS, tx is same DCS
         let pstr;
@@ -109,24 +101,12 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
             dstr.to_string(),
             pstr.to_string(),
         );
-        let tone = Tone {
-            mode: ToneMode::DCS,
-            ctcss: None,
-            dcs: Some(dcs_str),
-        };
+        let tone = Tone::Dcs(dcs_str);
         Ok((Some(tone.clone()), Some(tone)))
     } else if tone_mode == "Cross" { // look at CrossMode
         if cross_mode == "Tone->Tone" { // rx is CTCSS (cTone), tx is CTCSS (rTone)
-            let tone_rx = Tone {
-                mode: ToneMode::CTCSS,
-                ctcss: Some(Decimal::from_str(record.get("cToneFreq").unwrap()).unwrap()),
-                dcs: None,
-            };
-            let tone_tx = Tone {
-                mode: ToneMode::CTCSS,
-                ctcss: Some(Decimal::from_str(record.get("rToneFreq").unwrap()).unwrap()),
-                dcs: None,
-            };
+            let tone_rx = Tone::Ctcss(record.get("cToneFreq").unwrap().parse::<f64>()?);
+            let tone_tx = Tone::Ctcss(record.get("rToneFreq").unwrap().parse::<f64>()?);
             Ok((Some(tone_rx), Some(tone_tx)))
         } else if cross_mode == "Tone->DTCS" { // rx is DCS (RxDtcs or Dtcs), tx is CTCSS (rTone)
             let dstr = if record.get("RxDtcsCode").unwrap() == "" {
@@ -138,16 +118,8 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
                 dstr.to_string(),
                 record.get("DtcsPolarity").unwrap().chars().next().unwrap() // @TODO FIXME
             );
-            let tone_rx = Tone {
-                mode: ToneMode::DCS,
-                ctcss: None,
-                dcs: Some(dcs_str),
-            };
-            let tone_tx = Tone {
-                mode: ToneMode::CTCSS,
-                ctcss: Some(Decimal::from_str(record.get("rToneFreq").unwrap()).unwrap()),
-                dcs: None,
-            };
+            let tone_rx = Tone::Dcs(dcs_str);
+            let tone_tx = Tone::Ctcss(record.get("rToneFreq").unwrap().parse::<f64>()?);
             Ok((Some(tone_rx), Some(tone_tx)))
         } else if cross_mode == "DTCS->Tone" { // rx is CTCSS (rTone or cTone), tx is DCS (Dtcs)
             let tstr = if record.get("rToneFreq").unwrap() == "" {
@@ -155,11 +127,7 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
             } else {
                 record.get("rToneFreq").unwrap()
             };
-            let tone_rx = Tone {
-                mode: ToneMode::CTCSS,
-                ctcss: Some(Decimal::from_str(tstr).unwrap()),
-                dcs: None,
-            };
+            let tone_rx = Tone::Ctcss(tstr.parse::<f64>()?);
             let dstr = record.get("DtcsCode").unwrap();
             // second character of DtcsPolarity is DCS polarity, but needs to be mapped from NR to NI
             let pstr = match record.get("DtcsPolarity").unwrap().chars().nth(1).unwrap() {
@@ -171,11 +139,7 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
                 dstr.to_string(),
                 pstr.to_string(),
             );
-            let tone_tx = Tone {
-                mode: ToneMode::DCS,
-                ctcss: None,
-                dcs: Some(dcs_str),
-            };
+            let tone_tx = Tone::Dcs(dcs_str);
             Ok((Some(tone_rx), Some(tone_tx)))
         } else if cross_mode == "->Tone" { // rx is CTCSS (rTone or cTone), tx is carrier squelch
             let tstr = if record.get("rToneFreq").unwrap() == "" {
@@ -183,11 +147,7 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
             } else {
                 record.get("rToneFreq").unwrap()
             };
-            let tone_rx = Tone {
-                mode: ToneMode::CTCSS,
-                ctcss: Some(Decimal::from_str(tstr).unwrap()),
-                dcs: None,
-            };
+            let tone_rx = Tone::Ctcss(tstr.parse::<f64>()?);
             Ok((Some(tone_rx), None))
         } else if cross_mode == "->DTCS" { // rx is DCS (Dtcs or RxDtcs), tx is carrier squelch
             let pstr;
@@ -212,11 +172,7 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
                 dstr.to_string(),
                 pstr.to_string(),
             );
-            let tone_rx = Tone {
-                mode: ToneMode::DCS,
-                ctcss: None,
-                dcs: Some(dcs_str),
-            };
+            let tone_rx = Tone::Dcs(dcs_str);
             Ok((Some(tone_rx), None))
         } else if cross_mode == "Tone->" { // rx is carrier squelch, tx is CTCSS (rTone or cTone)
             let tstr = if record.get("rToneFreq").unwrap() == "" {
@@ -224,11 +180,7 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
             } else {
                 record.get("rToneFreq").unwrap()
             };
-            let tone_tx = Tone {
-                mode: ToneMode::CTCSS,
-                ctcss: Some(Decimal::from_str(tstr).unwrap()),
-                dcs: None,
-            };
+            let tone_tx = Tone::Ctcss(tstr.parse::<f64>()?);
             Ok((None, Some(tone_tx)))
         } else if cross_mode == "DTCS->" { // rx is carrier squelch, tx is DCS (Dtcs)
             let dstr = record.get("DtcsCode").unwrap();
@@ -241,11 +193,7 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
                 dstr.to_string(),
                 pstr.to_string(),
             );
-            let tone_tx = Tone {
-                mode: ToneMode::DCS,
-                ctcss: None,
-                dcs: Some(dcs_str),
-            };
+            let tone_tx = Tone::Dcs(dcs_str);
             Ok((None, Some(tone_tx)))
         } else if cross_mode == "DTCS->DTCS" { // rx is DCS (RxDtcs), tx is DCS (Dtcs)
             let tx_dstr = record.get("DtcsCode").unwrap();
@@ -258,11 +206,7 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
                 tx_dstr.to_string(),
                 tx_pstr.to_string(),
             );
-            let tone_tx = Tone {
-                mode: ToneMode::DCS,
-                ctcss: None,
-                dcs: Some(tx_dcs_str),
-            };
+            let tone_tx = Tone::Dcs(tx_dcs_str);
             let rx_dstr = record.get("RxDtcsCode").unwrap();
             let rx_pstr = match record.get("DtcsPolarity").unwrap().chars().nth(1).unwrap() {
                 'N' => "N",
@@ -273,11 +217,7 @@ fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<d
                 rx_dstr.to_string(),
                 rx_pstr.to_string(),
             );
-            let tone_rx = Tone {
-                mode: ToneMode::DCS,
-                ctcss: None,
-                dcs: Some(rx_dcs_str),
-            };
+            let tone_rx = Tone::Dcs(rx_dcs_str);
             Ok((Some(tone_rx), Some(tone_tx)))
         } else {
             Err(format!("Unsupported tone mode: {} cross mode: {}", tone_mode, cross_mode).into())
@@ -419,28 +359,40 @@ fn write_tones(channel: &Channel) -> (String, String, String, String, String, St
             let tone_rx = fm.tone_rx.as_ref().unwrap();
             let tone_tx = fm.tone_tx.as_ref().unwrap();
             if tone_rx == tone_tx {
-                match tone_rx.mode {
+                match tone_rx {
                     // identical CTCSS tones
-                    ToneMode::CTCSS => {
+                    Tone::Ctcss(_) => {
                         (
                             "Tone".to_string(), // Tone
-                            freq2str(&tone_rx.ctcss.as_ref().unwrap()), // rToneFreq
-                            freq2str(&tone_tx.ctcss.as_ref().unwrap()), // cToneFreq
+                            match tone_rx {
+                                Tone::Ctcss(freq) => format!("{:.1}", freq),
+                                _ => "88.5".to_string(),
+                            }, // rToneFreq
+                            match tone_tx {
+                                Tone::Ctcss(freq) => format!("{:.1}", freq),
+                                _ => "88.5".to_string(),
+                            }, // cToneFreq
                             "023".to_string(), // DtcsCode
                             "NN".to_string(), // DtcsPolarity
                             "023".to_string(), // RxDtcsCode
                             "Tone->Tone".to_string(), // CrossMode
                         )
                     }
-                    ToneMode::DCS => {
+                    Tone::Dcs(_) => {
                         // identical DCS tones
                         (
                             "DTCS".to_string(), // Tone
                             "88.5".to_string(), // rToneFreq
                             "88.5".to_string(), // cToneFreq
-                            tone_rx.dcs.as_ref().unwrap().to_string(), // DtcsCode @TODO
-                            "".to_string(), // DtcsPolarity @TODO
-                            tone_rx.dcs.as_ref().unwrap().to_string(), // RxDtcsCode @TODO
+                            match tone_rx {
+                                Tone::Dcs(dcs) => dcs.clone(),
+                                _ => "023".to_string(),
+                            }, // DtcsCode
+                            "NN".to_string(), // DtcsPolarity
+                            match tone_rx {
+                                Tone::Dcs(dcs) => dcs.clone(),
+                                _ => "023".to_string(),
+                            }, // RxDtcsCode
                             "DTCS".to_string(), // CrossMode
                         )
                     }
@@ -462,7 +414,10 @@ fn write_tones(channel: &Channel) -> (String, String, String, String, String, St
             let tone_rx = fm.tone_rx.as_ref().unwrap();
             return (
                 "Tone".to_string(),
-                freq2str(&tone_rx.ctcss.as_ref().unwrap()),
+                match tone_rx {
+                    Tone::Ctcss(freq) => freq.to_string(),
+                    _ => "88.5".to_string(),
+                },
                 "".to_string(),
                 "".to_string(),
                 "".to_string(),
@@ -475,7 +430,10 @@ fn write_tones(channel: &Channel) -> (String, String, String, String, String, St
             return (
                 "Tone".to_string(),
                 "".to_string(),
-                freq2str(&tone_tx.ctcss.as_ref().unwrap()),
+                match tone_tx {
+                    Tone::Ctcss(freq) => freq.to_string(),
+                    _ => "88.5".to_string(),
+                },
                 "".to_string(),
                 "".to_string(),
                 "".to_string(),

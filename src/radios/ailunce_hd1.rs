@@ -93,22 +93,14 @@ type CsvRecord = HashMap<String, String>;
 // - "62.5" or "123.0" for CTCSS tones
 // - "D023N" or "D754I" for DCS tones
 fn parse_tone(tone: &str) -> Option<Tone> {
-    if tone == "None" {
+    if tone == "Off" {
         return None;
     }
-    // if string begins with D, it's a DCS code
+    // if string begins with D, it's DCS
     if tone.starts_with("D") {
-        return Some(Tone {
-            mode: ToneMode::DCS,
-            ctcss: None,
-            dcs: Some(tone.to_string()),
-        });
+        return Some(Tone::Dcs(tone.trim().to_string()));
     }
-    Some(Tone {
-        mode: ToneMode::CTCSS,
-        ctcss: Some(Decimal::from_str(tone).unwrap()),
-        dcs: None,
-    })
+    return Some(Tone::Ctcss(tone.parse::<f64>().unwrap()));
 }
 
 fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dyn Error>> {

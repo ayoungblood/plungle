@@ -154,22 +154,14 @@ fn parse_power(power: &str) -> Power {
 // - "100" or "141.3" for CTCSS frequency (decimal point may or may not be present)
 // - "D023N" or "D754I" for DCS code (N for normal, I for inverted)
 fn parse_tone(tone: &str) -> Option<Tone> {
-    if tone == "None" {
+    if tone == "Off" {
         return None;
     }
-    // if string begins with D, it's a DCS code
+    // if string begins with D, it's DCS
     if tone.starts_with("D") {
-        return Some(Tone {
-            mode: ToneMode::DCS,
-            ctcss: None,
-            dcs: Some(tone.to_string()),
-        });
+        return Some(Tone::Dcs(tone.trim().to_string()));
     }
-    Some(Tone {
-        mode: ToneMode::CTCSS,
-        ctcss: Some(Decimal::from_str(tone).unwrap()),
-        dcs: None,
-    })
+    return Some(Tone::Ctcss(tone.parse::<f64>().unwrap()));
 }
 
 // Convert a squelch string into a Squelch struct
@@ -427,11 +419,10 @@ pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> 
 
 fn write_tone(tone: &Option<Tone>) -> String {
     match tone {
-        Some(t) => {
-            if t.mode == ToneMode::CTCSS {
-                t.ctcss.as_ref().unwrap().to_string()
-            } else {
-                t.dcs.as_ref().unwrap().to_string()
+        Some(tone) => {
+            match tone {
+                Tone::Ctcss(f) => format!("{:0.1}", f),
+                Tone::Dcs(d) => d.to_string(),
             }
         },
         None => "None".to_string(),

@@ -189,17 +189,9 @@ fn parse_tone(tone: &str) -> Option<Tone> {
     }
     // if string begins with D, it's DCS
     if tone.starts_with("D") {
-        return Some(Tone {
-            mode: ToneMode::DCS,
-            ctcss: None,
-            dcs: Some(tone.to_string()),
-        });
+        return Some(Tone::Dcs(tone.trim().to_string()));
     }
-    Some(Tone {
-        mode: ToneMode::CTCSS,
-        ctcss: Some(Decimal::from_str(tone).unwrap()),
-        dcs: None,
-    })
+    return Some(Tone::Ctcss(tone.parse::<f64>().unwrap()));
 }
 
 // Convert the CSV channel hashmap into a Channel struct
@@ -650,17 +642,17 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                     _ => return Err("Unrecognized bandwidth".into()),
                 }, // Band Width
                 if let Some(tone) = &channel.fm.as_ref().unwrap().tone_rx {
-                    match tone.mode {
-                        ToneMode::CTCSS => format!("{:0.1}", tone.ctcss.as_ref().unwrap()),
-                        ToneMode::DCS => tone.dcs.as_ref().unwrap().to_string(),
+                    match tone {
+                        Tone::Ctcss(ctcss) => format!("{:0.1}", ctcss),
+                        Tone::Dcs(dcs) => dcs.clone(),
                     }
                 } else {
                     "Off".to_string()
                 }, // CTCSS/DCS Decode
                 if let Some(tone) = &channel.fm.as_ref().unwrap().tone_tx {
-                    match tone.mode {
-                        ToneMode::CTCSS => format!("{:0.1}", tone.ctcss.as_ref().unwrap()),
-                        ToneMode::DCS => tone.dcs.as_ref().unwrap().to_string(),
+                    match tone {
+                        Tone::Ctcss(ctcss) => format!("{:0.1}", ctcss),
+                        Tone::Dcs(dcs) => dcs.clone(),
                     }
                 } else {
                     "Off".to_string()
