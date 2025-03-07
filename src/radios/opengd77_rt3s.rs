@@ -61,7 +61,7 @@ pub fn get_props() -> &'static structures::RadioProperties {
 // - Rx Only: [No, Yes]
 // - Zone Skip: [No, Yes]
 // - All Skip: [No, Yes]
-// - TOT: timeout timer in seconds, 0-??, 0 for disabled
+// - TOT: timeout timer, [15-495s,0 for infinite], set to 60s for Rx Only, default 0 (infinite)
 // - VOX: Off, ??? @TODO
 // - No Beep: No, ??? @TODO
 // - No Eco: No, ??? @TODO
@@ -132,27 +132,19 @@ pub fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug, opt:
 // - "P1".."P9" for power levels
 // - "-W+" for user configurable power
 fn parse_power(power: &str) -> Power {
-    if power == "Master" {
-        return Power {
-            default: true,
-            watts: None,
-        }
-    }
-    Power {
-        default: false,
-        watts: match power {
-            "P1" => Some(Decimal::new(50, 3)), // 50mW
-            "P2" => Some(Decimal::new(250, 3)), // 250mW
-            "P3" => Some(Decimal::new(500, 3)), // 500mW
-            "P4" => Some(Decimal::new(750, 3)), // 750mW
-            "P5" => Some(Decimal::new(1, 0)), // 1W
-            "P6" => Some(Decimal::new(2, 0)), // 2W
-            "P7" => Some(Decimal::new(3, 0)), // 3W
-            "P8" => Some(Decimal::new(4, 0)), // 4W
-            "P9" => Some(Decimal::new(5, 0)), // 5W
-            "-W+" => Some(Decimal::new(6, 0)), // @TODO user configurable power
-            _ => panic!("Unrecognized power level: {}", power),
-        },
+    return match power {
+        "Master" => Power::Default,
+        "P1" => Power::Watts(0.05), //  50mW
+        "P2" => Power::Watts(0.25), // 250mW
+        "P3" => Power::Watts(0.50), // 500mW
+        "P4" => Power::Watts(0.75), // 750mW
+        "P5" => Power::Watts(1.00), // 1W
+        "P6" => Power::Watts(2.00), // 2W
+        "P7" => Power::Watts(3.00), // 3W
+        "P8" => Power::Watts(4.00), // 4W
+        "P9" => Power::Watts(5.00), // 5W
+        "-W+" => Power::Watts(6.0), // user configurable, just assume 6W for now
+        _ => panic!("Unrecognized power level: {}", power),
     }
 }
 
@@ -226,8 +218,10 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
     channel.frequency_rx = Decimal::from_str(record.get("Rx Frequency").unwrap().trim())? * Decimal::new(1_000_000, 0);
     channel.frequency_tx = Decimal::from_str(record.get("Tx Frequency").unwrap().trim())? * Decimal::new(1_000_000, 0);
     channel.rx_only = record.get("Rx Only").unwrap() == "Yes";
-    if record.get("TOT").unwrap() != "0" {
-        channel.tx_tot = Timeout {default: false, seconds: Some(record.get("TOT").unwrap().parse::<u32>()?)};
+    if record.get("TOT").unwrap() == "0" {
+        channel.tx_tot = Timeout::Infinite;
+    } else {
+        channel.tx_tot = Timeout::Seconds(record.get("TOT").unwrap().parse::<u32>()?);
     }
     channel.power = parse_power(record.get("Power").unwrap().as_str());
     if record.get("Zone Skip").unwrap() == "Yes" || record.get("All Skip").unwrap() == "Yes" {
@@ -473,30 +467,39 @@ fn write_squelch(squelch: &Squelch) -> String {
 }
 
 fn write_power(power: &Power) -> String {
-    if power.default {
-        "Master".to_string()
-    } else {
-        if power.watts >= Some(Decimal::new(5, 0)) {
-            "P9".to_string()
-        } else if power.watts >= Some(Decimal::new(4, 0)) {
-            "P8".to_string()
-        } else if power.watts >= Some(Decimal::new(3, 0)) {
-            "P7".to_string()
-        } else if power.watts >= Some(Decimal::new(2, 0)) {
-            "P6".to_string()
-        } else if power.watts >= Some(Decimal::new(1, 0)) {
-            "P5".to_string()
-        } else if power.watts >= Some(Decimal::new(750, 3)) {
-            "P4".to_string()
-        } else if power.watts >= Some(Decimal::new(500, 3)) {
-            "P3".to_string()
-        } else if power.watts >= Some(Decimal::new(250, 3)) {
-            "P2".to_string()
-        } else if power.watts >= Some(Decimal::new(50, 3)) {
-            "P1".to_string()
-        } else {
-            "Master".to_string()
+    match power {
+        Power::Default => "Master".to_string(),
+        Power::Watts(w) => {
+            if *w >= 6.0 {
+                "-W+".to_string()
+            } else if *w >= 5.0 {
+                "P9".to_string()
+            } else if *w >= 4.0 {
+                "P8".to_string()
+            } else if *w >= 3.0 {
+                "P7".to_string()
+            } else if *w >= 2.0 {
+                "P6".to_string()
+            } else if *w >= 1.0 {
+                "P5".to_string()
+            } else if *w >= 0.75 {
+                "P4".to_string()
+            } else if *w >= 0.50 {
+                "P3".to_string()
+            } else if *w >= 0.25 {
+                "P2".to_string()
+            } else {
+                "P1".to_string()
+            }
         }
+    }
+}
+
+fn write_tx_tot(tx_tot: &Timeout) -> String {
+    match tx_tot {
+        Timeout::Default => "0".to_string(),
+        Timeout::Seconds(s) => s.to_string(),
+        Timeout::Infinite => "0".to_string(),
     }
 }
 
@@ -565,7 +568,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 if channel.rx_only { "Yes".to_string() } else { "No".to_string() },
                 if channel.scan.is_some() && channel.scan.as_ref().unwrap().zone_skip { "Yes".to_string() } else { "No".to_string() }, // Zone Skip
                 if channel.scan.is_some() && channel.scan.as_ref().unwrap().all_skip { "Yes".to_string() } else { "No".to_string() }, // All Skip
-                if channel.tx_tot.default || channel.tx_tot.seconds.is_none() { "0".to_string() } else { channel.tx_tot.seconds.unwrap().to_string() }, // TOT
+                write_tx_tot(&channel.tx_tot), // TOT
                 "Off".to_string(), // VOX
                 "No".to_string(), // No Beep
                 "No".to_string(), // No Eco
@@ -605,7 +608,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 if channel.rx_only { "Yes".to_string() } else { "No".to_string() },
                 if channel.scan.is_some() && channel.scan.as_ref().unwrap().zone_skip { "Yes".to_string() } else { "No".to_string() }, // Zone Skip
                 if channel.scan.is_some() && channel.scan.as_ref().unwrap().all_skip { "Yes".to_string() } else { "No".to_string() }, // All Skip
-                if channel.tx_tot.default { "0".to_string() } else { channel.tx_tot.seconds.unwrap().to_string() }, // TOT
+                write_tx_tot(&channel.tx_tot), // TOT
                 "Off".to_string(), // VOX
                 "No".to_string(), // No Beep
                 "No".to_string(), // No Eco

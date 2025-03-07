@@ -1,8 +1,6 @@
 // src/structures.rs
 
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Display, Formatter};
-use crate::helpers::freq2str;
 
 /// Channel mode
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
@@ -11,15 +9,6 @@ pub enum ChannelMode {
     AM,
     FM,
     DMR,
-}
-impl Display for ChannelMode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            ChannelMode::AM  => write!(f, "AM "),
-            ChannelMode::FM  => write!(f, "FM "),
-            ChannelMode::DMR => write!(f, "DMR"),
-        }
-    }
 }
 
 /// Squelch
@@ -43,14 +32,6 @@ pub struct Tone {
     pub ctcss: Option<rust_decimal::Decimal>,
     pub dcs: Option<String>,
 }
-impl Display for Tone {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.mode {
-            ToneMode::CTCSS => write!(f, "{}", freq2str(&self.ctcss.unwrap())),
-            ToneMode::DCS   => write!(f, "{}", self.dcs.as_ref().unwrap()),
-        }
-    }
-}
 
 /// Channel FM properties
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -73,38 +54,19 @@ pub struct DmrChannel {
 
 /// Timeout
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
-pub struct Timeout {
-    pub default: bool,
-    pub seconds: Option<u32>,
-}
-impl Display for Timeout {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.default {
-            return write!(f, "default");
-        }
-        match self.seconds {
-            Some(s) => write!(f, "  {:3} s", s),
-            None => write!(f, "  N/A  "),
-        }
-    }
+pub enum Timeout {
+    #[default]
+    Default,
+    Seconds(u32),
+    Infinite,
 }
 
 /// Power
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
-pub struct Power {
-    pub default: bool,
-    pub watts: Option<rust_decimal::Decimal>,
-}
-impl Display for Power {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.default {
-            return write!(f, "default");
-        }
-        match self.watts {
-            Some(w) => write!(f, "{:5.2} W", w),
-            None => write!(f, "  N/A  "),
-        }
-    }
+pub enum Power {
+    #[default]
+    Default,
+    Watts(f64),
 }
 
 /// Tx Permit
