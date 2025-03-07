@@ -46,13 +46,9 @@ fn pretty_scan(scan: &Option<Scan>) -> String {
 }
 
 fn pretty_squelch(squelch: &Squelch) -> String {
-    if squelch.default {
-        return "def".to_string();
-    }
-    if let Some(percent) = squelch.percent {
-        return format!("{:3}%", percent);
-    } else {
-        return "???".to_string();
+    match squelch {
+        Squelch::Default => "def".to_string(),
+        Squelch::Percent(percent) => format!("{:3}%", percent),
     }
 }
 

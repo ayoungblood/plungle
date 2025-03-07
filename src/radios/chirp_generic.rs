@@ -332,10 +332,7 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
                 "NFM" => Decimal::new(12_500, 0),
                 _ => return Err(format!("Unsupported mode: {}", record.get("mode").unwrap()).into()),
             },
-            squelch: Squelch {
-                default: true, // Chirp doesn't support configurable squelch
-                percent: None,
-            },
+            squelch: Squelch::Default, // chirp doesn't support squelch
             tone_rx: tone_rx,
             tone_tx: tone_tx,
         });
