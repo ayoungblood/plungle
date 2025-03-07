@@ -231,17 +231,9 @@ fn parse_tone(tone: &str) -> Option<Tone> {
     }
     // if string begins with D, it's DCS
     if tone.starts_with("D") {
-        return Some(Tone {
-            mode: ToneMode::DCS,
-            ctcss: None,
-            dcs: Some(tone.to_string()),
-        });
+        return Some(Tone::Dcs(tone.trim().to_string()));
     }
-    Some(Tone {
-        mode: ToneMode::CTCSS,
-        ctcss: Some(Decimal::from_str(tone).unwrap()),
-        dcs: None,
-    })
+    return Some(Tone::Ctcss(tone.parse::<f64>().unwrap()));
 }
 
 // Convert the CSV channel hashmap into a Channel struct
@@ -659,14 +651,10 @@ fn write_custom_ctcss(channel: &Channel) -> String {
     // if the CTCSS frequency is below 62.5 or above 254.1, write it as a custom frequency
     // @TODO this is an imperfect solution, but it works for now
     // we should be validating against a list of valid CTCSS frequencies
-    if let Some(tone) = &channel.fm {
-        if let Some(tone_rx) = &tone.tone_rx {
-            if tone_rx.mode == ToneMode::CTCSS {
-                if let Some(ctcss) = tone_rx.ctcss {
-                    if ctcss < Decimal::new(625, 1) || ctcss > Decimal::new(2541, 1) {
-                        return format!("{:0.1}", ctcss);
-                    }
-                }
+    if let Some(tone_rx) = &channel.fm.as_ref().unwrap().tone_rx {
+        if let Tone::Ctcss(ctcss) = tone_rx {
+            if *ctcss < 62.5 || *ctcss > 254.1 {
+                return format!("{:0.1}", ctcss);
             }
         }
     }
@@ -777,17 +765,17 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 write_power(&channel.power), // Transmit Power
                 format!("{}K", (channel.fm.as_ref().unwrap().bandwidth / Decimal::new(1_000, 0)).to_f64().unwrap()), // Band Width
                 if let Some(tone) = &channel.fm.as_ref().unwrap().tone_rx {
-                    match tone.mode {
-                        ToneMode::CTCSS => format!("{:0.1}", tone.ctcss.as_ref().unwrap()),
-                        ToneMode::DCS => tone.dcs.as_ref().unwrap().to_string(),
+                    match tone {
+                        Tone::Ctcss(freq) => format!("{:.1}", freq),
+                        Tone::Dcs(code) => code.to_string(),
                     }
                 } else {
                     "Off".to_string()
                 }, // CTCSS/DCS Decode
                 if let Some(tone) = &channel.fm.as_ref().unwrap().tone_tx {
-                    match tone.mode {
-                        ToneMode::CTCSS => format!("{:0.1}", tone.ctcss.as_ref().unwrap()),
-                        ToneMode::DCS => tone.dcs.as_ref().unwrap().to_string(),
+                    match tone {
+                        Tone::Ctcss(freq) => format!("{:.1}", freq),
+                        Tone::Dcs(code) => code.to_string(),
                     }
                 } else {
                     "Off".to_string()

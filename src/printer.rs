@@ -54,14 +54,9 @@ fn pretty_squelch(squelch: &Squelch) -> String {
 
 fn pretty_tone(tone: &Option<Tone>) -> String {
     if let Some(tone) = tone {
-        match tone.mode {
-            ToneMode::CTCSS => {
-                let freq = tone.ctcss.unwrap().to_f64().unwrap();
-                return format!("{:5.1}", freq);
-            },
-            ToneMode::DCS   => {
-                return format!("{}", tone.dcs.as_ref().unwrap());
-            },
+        match tone {
+            Tone::Ctcss(freq) => format!("{:5.1}", freq),
+            Tone::Dcs(code) => code.clone(),
         }
     } else {
         return "none".to_string();

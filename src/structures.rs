@@ -19,19 +19,11 @@ pub enum Squelch {
     Percent(u8), // 0-100
 }
 
-/// Tone mode
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub enum ToneMode {
-    CTCSS,
-    DCS,
-}
-
 /// Tone
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct Tone {
-    pub mode: ToneMode,
-    pub ctcss: Option<rust_decimal::Decimal>,
-    pub dcs: Option<String>,
+pub enum Tone {
+    Ctcss(f64),
+    Dcs(String),
 }
 
 /// Channel FM properties
