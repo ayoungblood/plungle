@@ -179,27 +179,13 @@ fn parse_tone(tone: &str) -> Option<Tone> {
 // - "Closed" for squelch closed (100%)
 // - "5%".."95%" for squelch level
 fn parse_squelch(squelch: &str) -> Squelch {
-    if squelch == "Disabled" {
-        return Squelch {
-            default: true,
-            percent: None,
-        }
-    }
-    if squelch == "Open" {
-        return Squelch {
-            default: false,
-            percent: Some(0),
-        }
-    }
-    if squelch == "Closed" {
-        return Squelch {
-            default: false,
-            percent: Some(100),
-        }
-    }
-    Squelch {
-        default: false,
-        percent: Some(squelch.trim_end_matches('%').parse().unwrap()),
+    match squelch {
+        "Disabled" => Squelch::Default,
+        "Open" => Squelch::Percent(0),
+        "Closed" => Squelch::Percent(100),
+        _ => {
+            Squelch::Percent(squelch.trim_end_matches('%').parse().unwrap())
+        },
     }
 }
 
@@ -453,16 +439,11 @@ fn write_tone(tone: &Option<Tone>) -> String {
 }
 
 fn write_squelch(squelch: &Squelch) -> String {
-    if squelch.default {
-        "Disabled".to_string()
-    } else {
-        // 0 is Open, 100 is Closed
-        let percent = (squelch.percent.unwrap() / 5) * 5;
-        match percent {
-            0 => "Open".to_string(),
-            100 => "Closed".to_string(),
-            p => format!("{}%", p),
-        }
+    match squelch { // 0 is Open, 100 is Closed
+        Squelch::Default => "Disabled".to_string(),
+        Squelch::Percent(p) if *p <    5 => format!("Open"),
+        Squelch::Percent(p) if *p == 100 => format!("Closed"),
+        Squelch::Percent(p) => format!("{}%", (p / 5) * 5),
     }
 }
 

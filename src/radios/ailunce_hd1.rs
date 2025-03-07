@@ -160,10 +160,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
         channel.fm = Some(FmChannel {
             // strip the 'K' from the end of the value
             bandwidth: Decimal::from_str(record.get("Band Width").unwrap().strip_suffix("K").unwrap())?,
-            squelch: Squelch {
-                default: true,
-                percent: None,
-            },
+            squelch: Squelch::Default,
             tone_rx: parse_tone(record.get("Dec QT/DQT").unwrap()),
             tone_tx: parse_tone(record.get("Enc QT/DQT").unwrap()),
         });

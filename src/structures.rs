@@ -12,10 +12,11 @@ pub enum ChannelMode {
 }
 
 /// Squelch
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct Squelch {
-    pub default: bool,
-    pub percent: Option<u8>, // 0-100
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
+pub enum Squelch {
+    #[default]
+    Default,
+    Percent(u8), // 0-100
 }
 
 /// Tone mode

@@ -284,10 +284,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
                 "25K" => Decimal::from_str("25.0").unwrap() * Decimal::new(1_000, 0),
                 _ => return Err(format!("Unrecognized bandwidth: {}", record.get("Band Width").unwrap()).into()),
             },
-            squelch: Squelch {
-                default: true,
-                percent: None,
-            },
+            squelch: Squelch::Default,
             tone_rx: parse_tone(record.get("CTCSS/DCS Decode").unwrap().as_str()),
             tone_tx: parse_tone(record.get("CTCSS/DCS Encode").unwrap().as_str()),
         });
