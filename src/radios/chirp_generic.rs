@@ -313,11 +313,7 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
             "off" => true,
             _ => false,
         };
-        channel.tx_tot = Timeout { default: true, seconds: None };
-        channel.power = Power {
-            default: false,
-            watts: Some(Decimal::from_str(record.get("Power").unwrap().strip_suffix("W").unwrap())?),
-        };
+        channel.power = Power::Watts(record.get("Power").unwrap().parse::<f64>()?);
         channel.scan = Some(Scan {
             zone_skip: false, // Chirp doesn't support zones
             all_skip: match record.get("Skip").unwrap().as_str() {
@@ -568,7 +564,10 @@ fn write_channels(codeplug: &Codeplug, path: &Path, opt: &Opt) -> Result<(), Box
                     true => "S",
                     false => "",
                 }.to_string(), // Skip
-                format!("{}W", channel.power.watts.as_ref().unwrap()), // Power
+                match channel.power {
+                    Power::Default => format!("{:0.1}W", 5.0), // default to 5W
+                    Power::Watts(w) => format!("{:0.1}W", w),
+                }, // Power
                 "".to_string(), // Comment
                 "".to_string(), // URCALL
                 "".to_string(), // RPT1CALL

@@ -48,7 +48,7 @@ pub fn get_props() -> &'static structures::RadioProperties {
 // - TOT[s]: seconds/15, default 4, 0 = infinite
 // - TOT Rekey Delay[s]: default 0
 // - Power: 0,1,2 for Low, Middle, High
-// - Admit Criteria: [0,1,2] for analog (Always, Channel Free, Correct CTCSS/DCS), [0,1,2] for DMR (Always, Channel Free, Color Code)
+// - Admit Criteria: [0,1,2] for analog (Always, Channel Free, Correct CTCSS/DCS), [0,1,3] for DMR (Always, Channel Free, Color Code)
 // - Auto Scan: default 0
 // - Rx Only: [0,1] = [off, on], default 0
 // - Lone Worker: default 0
@@ -156,15 +156,23 @@ fn parse_channel_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> R
     channel.frequency_rx = Decimal::from_str(record.get("RX Frequency(MHz)").unwrap().trim())? * Decimal::new(1_000_000, 0);
     channel.frequency_tx = Decimal::from_str(record.get("TX Frequency(MHz)").unwrap().trim())? * Decimal::new(1_000_000, 0);
     channel.rx_only = record.get("Rx Only").unwrap().as_str() == "1";
-    channel.tx_tot = match record.get("TOT[s]").unwrap().as_str() {
-        "0" => Timeout { default: true, seconds: None },
-        s => Timeout { default: false, seconds: Some(s.parse::<u32>()? * 15) },
-    };
+    if record.get("TOT[s]").unwrap() == "0" {
+        channel.tx_tot = Timeout::Infinite;
+    } else {
+        channel.tx_tot = Timeout::Seconds(record.get("TOT[s]").unwrap().parse::<u32>()? * 15);
+    }
     channel.power = match record.get("Power").unwrap().as_str() {
-        "0" => Power { default: false, watts: Some(Decimal::new( 1, 0)) }, // Low
-        "1" => Power { default: false, watts: Some(Decimal::new(25, 1)) }, // Middle
-        "2" => Power { default: false, watts: Some(Decimal::new( 5, 0)) }, // High
+        "0" => Power::Watts(1.0), // Low
+        "1" => Power::Watts(2.5), // Middle
+        "2" => Power::Watts(5.0), // High
         _ => return Err(format!("Unrecognized power level: {}", record.get("Power").unwrap()).into()),
+    };
+    channel.tx_permit = match record.get("Admit Criteria").unwrap().as_str() {
+        "0" => Some(TxPermit::Always),
+        "1" => Some(TxPermit::ChannelFree),
+        "2" => Some(TxPermit::CtcssDcsDifferent),
+        "3" => Some(TxPermit::ColorCodeSame),
+        _ => return Err(format!("Unrecognized admit criteria: {}", record.get("Admit Criteria").unwrap()).into()),
     };
     // mode specific fields
     match channel.mode {
@@ -304,6 +312,74 @@ fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<()
     Ok(())
 }
 
+fn write_squelch(squelch: &Squelch) -> String {
+    if squelch.default {
+        "1".to_string()
+    } else {
+        if squelch.percent.unwrap_or(10) < 10 {
+            "0".to_string()
+        } else {
+            (squelch.percent.unwrap_or(10) / 10).to_string()
+        }
+    }
+}
+
+fn write_tx_tot(tx_tot: &Timeout) -> String {
+    match tx_tot {
+        Timeout::Default => "4".to_string(),
+        Timeout::Seconds(s) => (s / 15).to_string(),
+        Timeout::Infinite => "0".to_string(),
+    }
+}
+
+fn write_tx_permit(tx_permit: &Option<TxPermit>) -> String {
+    match tx_permit {
+        Some(p) => match p {
+            TxPermit::Always => "0".to_string(),
+            TxPermit::ChannelFree => "1".to_string(),
+            TxPermit::CtcssDcsDifferent => "2".to_string(),
+            TxPermit::ColorCodeSame => "3".to_string(),
+            _ => "0".to_string(),
+        },
+        None => "0".to_string(),
+    }
+}
+
+fn write_tone(tone: &Option<Tone>) -> String {
+    match tone {
+        Some(t) => match t.mode {
+            ToneMode::CTCSS => format!("{:.1}", t.ctcss.as_ref().unwrap()),
+            ToneMode::DCS => t.dcs.as_ref().unwrap().to_string(),
+        },
+        None => "None".to_string(),
+    }
+}
+
+fn write_contact(channel: &Channel, codeplug: &Codeplug) -> String {
+    match &channel.dmr.as_ref().unwrap().talkgroup {
+        Some(tg) => {
+            // find the talkgroup in the codeplug
+            let index = codeplug.talkgroups.iter().position(|x| x.name == *tg).unwrap();
+            (index + 1).to_string()
+        },
+        None => "0".to_string(),
+    }
+}
+
+fn write_group_list(_channel: &Channel, _codeplug: &Codeplug) -> String {
+    "0".to_string()
+}
+
+fn write_power(power: &Power) -> String {
+    match power {
+        Power::Default => "2".to_string(), // Default to High
+        Power::Watts(w) if *w >= 5.0 => "2".to_string(), // High
+        Power::Watts(w) if *w >= 2.5 => "1".to_string(), // Middle
+        Power::Watts(w) if *w >= 1.0 => "0".to_string(), // Low
+        _ => "0".to_string(),
+    }
+}
+
 fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
@@ -338,7 +414,7 @@ fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), 
         "Emergency Alarm Ack",
         "Data Call Confirmed",
         "Allow Interrupt",
-        "DCDCM Switch",
+        "DCDM Switch",
         "Leader/MS",
         "Emergency System",
         "Contact Name",
@@ -351,7 +427,7 @@ fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), 
         "GPS System",
         "CTCSS/DCS Dec",
         "CTCSS/DCS Enc",
-        "RX Signaling System",
+        "Rx Signaling System",
         "Tx Signaling System",
         "QT Reverse",
         "Non-QT/DQT Turn-off Freq",
@@ -382,18 +458,13 @@ fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), 
                     _ => return Err("Unrecognized bandwidth".into()),
                 },
                 "0".to_string(), // Scan List
-                channel.fm.as_ref().unwrap().squelch.percent.unwrap_or(10).to_string(), // Squelch
+                write_squelch(&channel.fm.as_ref().unwrap().squelch), // Squelch
                 "0".to_string(), // RX Ref Frequency
                 "0".to_string(), // TX Ref Frequency
-                channel.tx_tot.seconds.unwrap_or(4 * 15).to_string(), // TOT[s]
+                write_tx_tot(&channel.tx_tot), // TOT[s]
                 "0".to_string(), // TOT Rekey Delay[s]
-                match channel.power.watts.unwrap() {
-                    w if w == Decimal::new(1, 0) => "0".to_string(), // Low
-                    w if w == Decimal::new(25, 1) => "1".to_string(), // Middle
-                    w if w == Decimal::new(5, 0) => "2".to_string(), // High
-                    _ => return Err("Unrecognized power level".into()),
-                },
-                "0".to_string(), // Admit Criteria (Always)
+                write_power(&channel.power), // Power
+                write_tx_permit(&channel.tx_permit), // Admit Criteria (Always)
                 "0".to_string(), // Auto Scan
                 if channel.rx_only { "1" } else { "0" }.to_string(), // Rx Only
                 "0".to_string(), // Lone Worker
@@ -412,6 +483,60 @@ fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), 
                 "0".to_string(), // Group List
                 "1".to_string(), // Color Code
                 "0".to_string(), // Repeater Slot
+                "0".to_string(), // In Call Criteria
+                "0".to_string(), // Privacy
+                "0".to_string(), // Privacy No.
+                "0".to_string(), // GPS System
+                write_tone(&channel.fm.as_ref().unwrap().tone_rx), // CTCSS/DCS Dec
+                write_tone(&channel.fm.as_ref().unwrap().tone_tx), // CTCSS/DCS Enc
+                "0".to_string(), // RX Signaling System
+                "0".to_string(), // Tx Signaling System
+                "0".to_string(), // QT Reverse
+                "2".to_string(), // Non-QT/DQT Turn-off Freq
+                "1".to_string(), // Display PTT ID
+                "1".to_string(), // Reverse Burst/Turn-off Code
+                "0".to_string(), // Decode 1
+                "0".to_string(), // Decode 2
+                "0".to_string(), // Decode 3
+                "0".to_string(), // Decode 4
+                "0".to_string(), // Decode 5
+                "0".to_string(), // Decode 6
+                "0".to_string(), // Decode 7
+                "0".to_string(), // Decode 8
+            ])?;
+        } else if channel.mode == ChannelMode::DMR {
+            writer.write_record(&[
+                "2".to_string(), // Channel Mode
+                channel.name.clone(), // Channel Name
+                format!("{:.5}", channel.frequency_rx / Decimal::new(1_000_000, 0)), // RX Frequency(MHz)
+                format!("{:.5}", channel.frequency_tx / Decimal::new(1_000_000, 0)), // TX Frequency(MHz)
+                "0".to_string(), // Band Width
+                "0".to_string(), // Scan List
+                "1".to_string(), // Squelch
+                "0".to_string(), // RX Ref Frequency
+                "0".to_string(), // TX Ref Frequency
+                write_tx_tot(&channel.tx_tot), // TOT[s]
+                "0".to_string(), // TOT Rekey Delay[s]
+                write_power(&channel.power), // Power,
+                write_tx_permit(&channel.tx_permit), // Admit Criteria (Always)
+                "0".to_string(), // Auto Scan
+                if channel.rx_only { "1" } else { "0" }.to_string(), // Rx Only
+                "0".to_string(), // Lone Worker
+                "0".to_string(), // VOX
+                "0".to_string(), // Allow Talkaround
+                "0".to_string(), // Send GPS Info
+                "0".to_string(), // Receive GPS Info
+                "0".to_string(), // Private Call Confirmed
+                "0".to_string(), // Emergency Alarm Ack
+                "0".to_string(), // Data Call Confirmed
+                "0".to_string(), // Allow Interrupt
+                "0".to_string(), // DCDCM Switch
+                "1".to_string(), // Leader/MS
+                "0".to_string(), // Emergency System
+                write_contact(&channel, &codeplug), // Contact Name
+                write_group_list(&channel, &codeplug), // Group List
+                channel.dmr.as_ref().unwrap().color_code.to_string(), // Color Code
+                (channel.dmr.as_ref().unwrap().timeslot - 1).to_string(), // Repeater Slot
                 "0".to_string(), // In Call Criteria
                 "0".to_string(), // Privacy
                 "0".to_string(), // Privacy No.

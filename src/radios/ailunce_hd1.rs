@@ -33,6 +33,7 @@ pub fn get_props() -> &'static structures::RadioProperties {
 // * Contacts
 // * Priority Contacts
 // This implies that most codeplugs will take quite a lot of manual fixing-up
+// Specs: VHF power 10W/5W/1W, UHF power 8W/4W/1W
 
 // Channels.csv
 // - No.: Channel index, rows 1-2 are VFO-A, VFO-B
@@ -40,8 +41,8 @@ pub fn get_props() -> &'static structures::RadioProperties {
 // - Channel Alias: channel name
 // - Rx Frequency: receive frequency
 // - Tx Frequency: transmit frequency
-// - Tx Power: [Low,??,High]
-// - TOT: timeout timer, [75S,180S,???]
+// - Tx Power: [Low,Mid,High]
+// - TOT: timeout timer, [15S,30S..600S,Endless] default 75S
 // - VOX: [No,??]
 // - VOX Level: [1,2,??]\
 // - Scan Add/Step: scan add for non-VFO, step for VFO, [Yes,No] for regular channels
@@ -135,6 +136,26 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
     channel.frequency_rx = Decimal::from_str(record.get("Rx Frequency").unwrap())? * Decimal::new(1_000_000, 0);
     channel.frequency_tx = Decimal::from_str(record.get("Tx Frequency").unwrap())? * Decimal::new(1_000_000, 0);
     channel.rx_only = record.get("Tx Authority").unwrap() == "Prohibit TX";
+    if record.get("TOT").unwrap() == "Endless" {
+        channel.tx_tot = Timeout::Infinite;
+    } else {
+        channel.tx_tot = Timeout::Seconds(record.get("TOT").unwrap().strip_suffix("S").unwrap().parse::<u32>()?);
+    }
+    if channel.frequency_tx <= Decimal::new(174_000_000, 0) { // VHF
+        channel.power = match record.get("Tx Power").unwrap().as_str() {
+            "Low" => Power::Watts(1.0),
+            "Mid" => Power::Watts(5.0),
+            "High" => Power::Watts(10.0),
+            _ => return Err(format!("Unrecognized power level: {}", record.get("Tx Power").unwrap()).into()),
+        };
+    } else { // UHF
+        channel.power = match record.get("Tx Power").unwrap().as_str() {
+            "Low" => Power::Watts(1.0),
+            "Mid" => Power::Watts(4.0),
+            "High" => Power::Watts(8.0),
+            _ => return Err(format!("Unrecognized power level: {}", record.get("Tx Power").unwrap()).into()),
+        };
+    }
     if channel.mode == ChannelMode::FM { // FM specific fields
         channel.fm = Some(FmChannel {
             // strip the 'K' from the end of the value
@@ -252,7 +273,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
     for channel in &codeplug.channels {
         uprintln!(opt, Stderr, None, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width = get_props().channel_index_width);
         uprintln!(opt, Stderr, None, 4, "    {:?}", channel);
-
+        todo!();
     }
 
     writer.flush()?;
