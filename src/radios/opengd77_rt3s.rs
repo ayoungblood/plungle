@@ -154,14 +154,14 @@ fn parse_power(power: &str) -> Power {
 // - "100" or "141.3" for CTCSS frequency (decimal point may or may not be present)
 // - "D023N" or "D754I" for DCS code (N for normal, I for inverted)
 fn parse_tone(tone: &str) -> Option<Tone> {
-    if tone == "Off" {
+    if tone == "Off" || tone == "None" {
         return None;
     }
     // if string begins with D, it's DCS
     if tone.starts_with("D") {
         return Some(Tone::Dcs(tone.trim().to_string()));
     }
-    return Some(Tone::Ctcss(tone.parse::<f64>().unwrap()));
+    return Some(Tone::Ctcss(tone.trim().parse::<f64>().unwrap()));
 }
 
 // Convert a squelch string into a Squelch struct
