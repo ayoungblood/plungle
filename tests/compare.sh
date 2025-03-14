@@ -63,3 +63,21 @@ for file in $(ls $tempdir/output); do
     diff --strip-trailing-cr $tempdir/output/$file ../fixtures/alinco_dj-md5t/basic/$file
     printf "[compare.sh]     diff returned $?\n"
 done
+
+printf "\n[compare.sh] Testing Chirp (generic) >>>>>>>>>>>>>>>>>>>>>\n"
+rm -rf $tempdir/*
+
+# Parse chirp fixture and write to output.json
+$target parse chirp_generic ../fixtures/chirp_generic/basic.csv $tempdir/output.json
+printf "\n[compare.sh] parse finished with return code $?\n\n"
+
+# Generate chirp codeplug from output.json
+$target generate chirp_generic $tempdir/output.json $tempdir/output.csv
+printf "\n[compare.sh] generate finished with return code $?\n\n"
+
+# Compare generated codeplug with original, file by file
+printf "[compare.sh] Comparing files, ignoring line endings\n"
+file="basic.csv"
+printf "[compare.sh] Comparing $file\n"
+diff --strip-trailing-cr $tempdir/output.csv ../fixtures/chirp_generic/$file
+printf "[compare.sh]     diff returned $?\n"
