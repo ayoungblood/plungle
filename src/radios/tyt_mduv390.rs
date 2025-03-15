@@ -139,7 +139,7 @@ fn parse_channel_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> R
     // shared fields
     // there is no index in the CSV, so we have to generate it from a counter
     static CHANNEL_INDEX: AtomicUsize = AtomicUsize::new(1);
-    channel.index = CHANNEL_INDEX.fetch_add(1, Ordering::SeqCst);
+    channel.index = CHANNEL_INDEX.fetch_add(1, Ordering::Relaxed);
     channel.name = record.get("Channel Name").unwrap().to_string();
     channel.mode = match record.get("Channel Mode").unwrap().as_str() {
         "1" => ChannelMode::FM,

@@ -8,6 +8,7 @@ use std::path::Path;
 use std::collections::HashMap;
 use rust_decimal::prelude::*;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::*;
 use crate::structures::*;
@@ -240,7 +241,9 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
 
 pub fn parse_zone_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<Zone, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
+    static ZONE_INDEX: AtomicUsize = AtomicUsize::new(1);
     let mut zone = Zone {
+        index: ZONE_INDEX.fetch_add(1, Ordering::Relaxed),
         name: record.get("Zone Name").unwrap().to_string(),
         channels: Vec::new(),
     };

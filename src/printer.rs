@@ -129,10 +129,11 @@ fn print_zones(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>>
 
     let mut output = String::new();
     output.push_str(&format!("Zones\n"));
-    output.push_str(&format!("    {:16} {:7} {}\n",
-        "name", "len", "channels"));
+    output.push_str(&format!("    {:3} {:16} {:3} {}\n",
+        "no", "name", "len", "channels"));
     for zone in &codeplug.zones {
-        output.push_str(&format!("    {:16} {:7} {}\n",
+        output.push_str(&format!("    {:3} {:16} {:3} {}\n",
+            zone.index,
             zone.name,
             zone.channels.len(),
             zone.channels.iter().map(|ch| ch.to_string()).collect::<Vec<String>>().join(", "),

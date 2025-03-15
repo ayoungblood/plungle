@@ -7,6 +7,7 @@ use std::path::Path;
 use std::collections::HashMap;
 use rust_decimal::prelude::*;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::*;
 use crate::structures::*;
@@ -254,12 +255,13 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
 // Convert the CSV zone hashmap into a Zone struct
 fn parse_zone_record(csv_zone: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<Zone, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", csv_zone);
+    static ZONE_INDEX: AtomicUsize = AtomicUsize::new(1);
     let mut zone = Zone {
-        name: String::new(),
+        index: ZONE_INDEX.fetch_add(1, Ordering::Relaxed),
+        name: csv_zone.get("Zone Name").unwrap().to_string(),
         channels: Vec::new(),
     };
 
-    zone.name = csv_zone.get("Zone Name").unwrap().to_string();
     // Channels are stored as a list of names, separated by "|"
     let channel_names: Vec<&str> = csv_zone.get("Zone Channel Member").unwrap().split('|').collect();
     for name in channel_names {

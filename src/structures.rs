@@ -102,6 +102,7 @@ pub struct Channel {
 /// Zone (a zone is a collection of channels)
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Zone {
+    pub index: usize,
     pub name: String,
     pub channels: Vec<String>,
 }
