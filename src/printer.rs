@@ -115,7 +115,7 @@ fn print_channels(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Erro
     let mut output = String::new();
     output.push_str(&format!("Channels\n"));
     output.push_str(&format!("    {:4} {:16} {:4} {:12} {:12} {:3} {:4} {:5} {:7} {:7}\n",
-        "no", "name", "mode", "rxf", "txf", "rxo", "tot", "power", "txprmit", "scan"));
+        "idx", "name", "mode", "rxf", "txf", "rxo", "tot", "power", "txprmit", "scan"));
     for channel in &codeplug.channels {
         output.push_str(&pretty_channel(opt, channel));
         output.push('\n');
@@ -129,10 +129,11 @@ fn print_zones(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>>
 
     let mut output = String::new();
     output.push_str(&format!("Zones\n"));
-    output.push_str(&format!("    {:16} {:7} {}\n",
-        "name", "len", "channels"));
+    output.push_str(&format!("    {:3} {:16} {:3} {}\n",
+        "idx", "name", "len", "channels"));
     for zone in &codeplug.zones {
-        output.push_str(&format!("    {:16} {:7} {}\n",
+        output.push_str(&format!("    {:3} {:16} {:3} {}\n",
+            zone.index,
             zone.name,
             zone.channels.len(),
             zone.channels.iter().map(|ch| ch.to_string()).collect::<Vec<String>>().join(", "),
@@ -147,10 +148,11 @@ fn print_talkgroups(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Er
 
     let mut output = String::new();
     output.push_str(&format!("Talkgroups\n"));
-    output.push_str(&format!("    {:16} {:8} {:4}\n",
-        "name", "id", "type"));
+    output.push_str(&format!("    {:3} {:16} {:8} {:4}\n",
+        "idx", "name", "id", "type"));
     for tg in &codeplug.talkgroups {
-        output.push_str(&format!("    {:16} {:8} {:4}\n",
+        output.push_str(&format!("    {:3} {:16} {:8} {:4}\n",
+            tg.index,
             tg.name,
             tg.id,
             match tg.call_type {
@@ -169,10 +171,11 @@ fn print_talkgroup_lists(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<d
 
     let mut output = String::new();
     output.push_str(&format!("Talkgroup Lists\n"));
-    output.push_str(&format!("    {:16} {:3} {}\n",
-        "name", "len", "talkgroups"));
+    output.push_str(&format!("    {:3} {:16} {:3} {}\n",
+        "idx", "name", "len", "talkgroups"));
     for tg in &codeplug.talkgroup_lists {
-        output.push_str(&format!("    {:16} {:3} {}\n",
+        output.push_str(&format!("    {:3} {:16} {:3} {}\n",
+            tg.index,
             tg.name,
             tg.talkgroups.len(),
             tg.talkgroups.iter().map(|tg| tg.name.to_string()).collect::<Vec<String>>().join(", "),

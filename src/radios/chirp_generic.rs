@@ -152,7 +152,7 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
 
     // chirp uses zero-index, +1 to match other CPS
     if record.get("Mode").unwrap().as_str() == "NFM" || record.get("Mode").unwrap().as_str() == "FM" {
-        channel.index = record.get("Location").unwrap().parse::<u32>()? + 1;
+        channel.index = record.get("Location").unwrap().parse::<usize>()? + 1;
         channel.name = record.get("Name").unwrap().to_string();
         channel.mode = ChannelMode::FM;
         channel.frequency_rx = Decimal::from_str(record.get("Frequency").unwrap())? * Decimal::new(1_000_000, 0);

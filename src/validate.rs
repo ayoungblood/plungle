@@ -18,7 +18,7 @@ pub enum Severity {
 pub struct Complaint {
     pub severity: Severity,
     pub message: String,
-    pub source_index: Option<u32>,
+    pub source_index: Option<usize>,
     pub source_name: Option<String>,
 }
 

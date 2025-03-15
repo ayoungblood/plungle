@@ -69,11 +69,11 @@ enum Commands {
 }
 
 // @TODO re-implement filtering and move to a separate module
-fn filter_codeplug(codeplug: &structures::Codeplug, _opt: &Opt) -> Result<structures::Codeplug, Box<dyn Error>> {
+fn filter_codeplug(_opt: &Opt, codeplug: &structures::Codeplug) -> Result<structures::Codeplug, Box<dyn Error>> {
     return Ok(codeplug.clone());
 }
 
-fn read_codeplug(input_path: &PathBuf, opt: &Opt) -> Result<structures::Codeplug, Box<dyn Error>> {
+fn read_codeplug(opt: &Opt, input_path: &PathBuf) -> Result<structures::Codeplug, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     // if we recognize the file extension, use it to determine the file format
     // otherwise, use --format (which defaults to JSON)
@@ -103,7 +103,7 @@ fn read_codeplug(input_path: &PathBuf, opt: &Opt) -> Result<structures::Codeplug
     Ok(codeplug)
 }
 
-fn write_codeplug(output_path: &Option<PathBuf>, codeplug: &structures::Codeplug, opt: &Opt) -> Result<(), Box<dyn Error>> {
+fn write_codeplug(opt: &Opt, output_path: &Option<PathBuf>, codeplug: &structures::Codeplug) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     // if we recognize the file extension, use it to determine the file format
     // otherwise, use --format (which defaults to JSON)
@@ -153,23 +153,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     match &opt.command {
         Some(Commands::Parse { model, input, output }) => {
             // parse codeplug
-            let mut codeplug = radios::parse_codeplug(model, input, &opt)?;
+            let mut codeplug = radios::parse_codeplug(&opt, model, input)?;
             // filter codeplug
-            codeplug = filter_codeplug(&codeplug, &opt)?;
+            codeplug = filter_codeplug(&opt, &codeplug)?;
             // validate codeplug
-            radios::validate_codeplug(&codeplug, &model, &opt)?;
+            radios::validate_codeplug(&opt, &codeplug, &model)?;
             // write intermediary file
-            write_codeplug(&output, &codeplug, &opt)?;
+            write_codeplug(&opt, &output, &codeplug)?;
         }
         Some(Commands::Generate { model, input, output }) => {
             // read intermediary file
-            let mut codeplug = read_codeplug(&input, &opt)?;
+            let mut codeplug = read_codeplug(&opt, &input)?;
             // filter codeplug
-            codeplug = filter_codeplug(&codeplug, &opt)?;
+            codeplug = filter_codeplug(&opt, &codeplug)?;
             // validate codeplug
-            radios::validate_codeplug(&codeplug, &model, &opt)?;
+            radios::validate_codeplug(&opt, &codeplug, &model)?;
             // generate codeplug
-            radios::generate_codeplug(&codeplug, &model, &output, &opt)?;
+            radios::generate_codeplug(&opt, &codeplug, &model, &output)?;
         }
         Some(Commands::Merge { inputs: _ }) => {
             // @TODO implement merge

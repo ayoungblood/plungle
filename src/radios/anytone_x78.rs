@@ -8,6 +8,7 @@ use std::path::Path;
 use std::collections::HashMap;
 use rust_decimal::prelude::*;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::*;
 use crate::structures::*;
@@ -173,7 +174,9 @@ type CsvRecord = HashMap<String, String>;
 
 fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
+    static TALKGROUP_INDEX: AtomicUsize = AtomicUsize::new(1);
     let talkgroup = DmrTalkgroup {
+        index: TALKGROUP_INDEX.fetch_add(1, Ordering::Relaxed),
         id: record.get("Radio ID").unwrap().parse::<u32>()?,
         name: record.get("Name").unwrap().to_string(),
         call_type: match record.get("Call Type").unwrap().as_str() {
@@ -182,6 +185,7 @@ fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup,
             "All Call" => DmrTalkgroupCallType::AllCall,
             _ => return Err(format!("Unrecognized call type: {}", record.get("Call Type").unwrap()).into()),
         },
+        alert: record.get("Call Alert").unwrap() == "Online Alert",
     };
 
     Ok(talkgroup)
@@ -189,7 +193,9 @@ fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup,
 
 fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<DmrTalkgroupList, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
+    static TALKGROUP_LIST_INDEX: AtomicUsize = AtomicUsize::new(1);
     let mut talkgroup_list = DmrTalkgroupList {
+        index: TALKGROUP_LIST_INDEX.fetch_add(1, Ordering::Relaxed),
         name: record.get("Group Name").unwrap().to_string(),
         talkgroups: Vec::new(),
     };
@@ -241,7 +247,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     let mut channel = Channel::default();
 
-    channel.index = record.get("No.").unwrap().parse::<u32>()?;
+    channel.index = record.get("No.").unwrap().parse::<usize>()?;
     channel.name = record.get("Channel Name").unwrap().to_string();
     channel.mode = match record.get("Channel Type").unwrap().as_str() {
         "A-Analog" => ChannelMode::FM,
@@ -311,12 +317,13 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
 // Convert the CSV zone hashmap into a Zone struct
 fn parse_zone_record(csv_zone: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<Zone, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", csv_zone);
+    static ZONE_INDEX: AtomicUsize = AtomicUsize::new(1);
     let mut zone = Zone {
-        name: String::new(),
+        index: ZONE_INDEX.fetch_add(1, Ordering::Relaxed),
+        name: csv_zone.get("Zone Name").unwrap().to_string(),
         channels: Vec::new(),
     };
 
-    zone.name = csv_zone.get("Zone Name").unwrap().to_string();
     // Channels are stored as a list of names, separated by "|"
     let channel_names: Vec<&str> = csv_zone.get("Zone Channel Member").unwrap().split('|').collect();
     for name in channel_names {
@@ -502,7 +509,7 @@ pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Resul
                 DmrTalkgroupCallType::Private => "Private Call".to_string(),
                 DmrTalkgroupCallType::AllCall => "All Call".to_string(),
             }, // Call Type
-            "None".to_string(), // Call Alert
+            if talkgroup.alert { "Online Alert".to_string() } else { "None".to_string() }, // Call Alert
         ])?;
     }
 
