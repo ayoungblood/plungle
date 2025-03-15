@@ -7,7 +7,7 @@ use std::path::Path;
 use std::collections::HashMap;
 use rust_decimal::prelude::*;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::*;
 use crate::structures::*;
@@ -138,8 +138,8 @@ fn parse_channel_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> R
 
     // shared fields
     // there is no index in the CSV, so we have to generate it from a counter
-    static CHANNEL_COUNTER: AtomicU32 = AtomicU32::new(1);
-    channel.index = CHANNEL_COUNTER.fetch_add(1, Ordering::SeqCst);
+    static CHANNEL_INDEX: AtomicUsize = AtomicUsize::new(1);
+    channel.index = CHANNEL_INDEX.fetch_add(1, Ordering::SeqCst);
     channel.name = record.get("Channel Name").unwrap().to_string();
     channel.mode = match record.get("Channel Mode").unwrap().as_str() {
         "1" => ChannelMode::FM,

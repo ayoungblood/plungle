@@ -187,7 +187,7 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
     let mut channel = Channel::default();
 
     // shared fields
-    channel.index = record.get("Channel Number").unwrap().parse::<u32>()?;
+    channel.index = record.get("Channel Number").unwrap().parse::<usize>()?;
     channel.name = record.get("Channel Name").unwrap().to_string();
     channel.mode = match record.get("Channel Type").unwrap().as_str() {
         "Analogue" => ChannelMode::FM,

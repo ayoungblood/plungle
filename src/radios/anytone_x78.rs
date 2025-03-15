@@ -242,7 +242,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     let mut channel = Channel::default();
 
-    channel.index = record.get("No.").unwrap().parse::<u32>()?;
+    channel.index = record.get("No.").unwrap().parse::<usize>()?;
     channel.name = record.get("Channel Name").unwrap().to_string();
     channel.mode = match record.get("Channel Type").unwrap().as_str() {
         "A-Analog" => ChannelMode::FM,

@@ -84,7 +84,7 @@ pub struct Scan {
 /// Channel
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
 pub struct Channel {
-    pub index: u32,
+    pub index: usize,
     pub name: String,
     pub mode: ChannelMode,
     pub frequency_rx: rust_decimal::Decimal,
