@@ -182,6 +182,7 @@ fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup,
             "All Call" => DmrTalkgroupCallType::AllCall,
             _ => return Err(format!("Unrecognized call type: {}", record.get("Call Type").unwrap()).into()),
         },
+        alert: record.get("Call Alert").unwrap() == "Online Alert",
     };
 
     Ok(talkgroup)
@@ -502,7 +503,7 @@ pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Resul
                 DmrTalkgroupCallType::Private => "Private Call".to_string(),
                 DmrTalkgroupCallType::AllCall => "All Call".to_string(),
             }, // Call Type
-            "None".to_string(), // Call Alert
+            if talkgroup.alert { "Online Alert".to_string() } else { "None".to_string() }, // Call Alert
         ])?;
     }
 

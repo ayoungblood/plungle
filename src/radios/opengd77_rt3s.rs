@@ -99,6 +99,7 @@ pub fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgr
             "AllCall" => DmrTalkgroupCallType::AllCall,
             _ => return Err(format!("Unrecognized call type: {}", record.get("Call Type").unwrap()).into()),
         },
+        alert: false, // not supported
     };
     Ok(talkgroup)
 }

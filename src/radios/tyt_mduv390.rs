@@ -102,6 +102,7 @@ fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup,
             "3" => DmrTalkgroupCallType::AllCall,
             _ => return Err(format!("Unrecognized call type: {}", record.get("Call Type").unwrap()).into()),
         },
+        alert: record.get("Call Receive Tone").unwrap() == "1",
     };
     Ok(talkgroup)
 }
@@ -294,7 +295,7 @@ fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<()
                 DmrTalkgroupCallType::AllCall => "3".to_string(),
             },
             talkgroup.id.to_string(), // Call ID
-            "0".to_string(), // Call Receive Tone (unsupported)
+            if talkgroup.alert { "1".to_string() } else { "0".to_string() }, // Call Receive Tone
         ])?;
     }
     writer.flush()?;

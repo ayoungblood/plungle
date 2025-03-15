@@ -64,8 +64,9 @@ pub enum Power {
 
 /// Tx Permit
 // aka TX Admit, TX Authority, TX Inhibit
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
 pub enum TxPermit {
+    #[default]
     Always,
     ChannelFree,
     CtcssDcsDifferent,
@@ -119,6 +120,7 @@ pub struct DmrTalkgroup {
     pub id: u32,
     pub name: String,
     pub call_type: DmrTalkgroupCallType,
+    pub alert: bool,
 }
 
 /// DMR Talkgroup List

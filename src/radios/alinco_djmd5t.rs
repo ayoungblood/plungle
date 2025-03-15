@@ -143,6 +143,7 @@ fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup,
             "All Call" => DmrTalkgroupCallType::AllCall,
             _ => return Err(format!("Unrecognized call type: {}", record.get("Call Type").unwrap()).into()),
         },
+        alert: false, // @TODO FIXME
     };
 
     Ok(talkgroup)
