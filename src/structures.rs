@@ -64,8 +64,9 @@ pub enum Power {
 
 /// Tx Permit
 // aka TX Admit, TX Authority, TX Inhibit
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
 pub enum TxPermit {
+    #[default]
     Always,
     ChannelFree,
     CtcssDcsDifferent,
@@ -83,7 +84,7 @@ pub struct Scan {
 /// Channel
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
 pub struct Channel {
-    pub index: u32,
+    pub index: usize,
     pub name: String,
     pub mode: ChannelMode,
     pub frequency_rx: rust_decimal::Decimal,
@@ -101,6 +102,7 @@ pub struct Channel {
 /// Zone (a zone is a collection of channels)
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Zone {
+    pub index: usize,
     pub name: String,
     pub channels: Vec<String>,
 }
@@ -116,14 +118,17 @@ pub enum DmrTalkgroupCallType {
 /// DMR Talkgroup
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct DmrTalkgroup {
+    pub index: usize,
     pub id: u32,
     pub name: String,
     pub call_type: DmrTalkgroupCallType,
+    pub alert: bool,
 }
 
 /// DMR Talkgroup List
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct DmrTalkgroupList {
+    pub index: usize,
     pub name: String,
     pub talkgroups: Vec<DmrTalkgroup>,
 }

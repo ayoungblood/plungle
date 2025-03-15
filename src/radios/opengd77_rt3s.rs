@@ -8,6 +8,7 @@ use std::path::Path;
 use std::collections::HashMap;
 use rust_decimal::prelude::*;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::*;
 use crate::structures::*;
@@ -90,7 +91,9 @@ type CsvRecord = HashMap<String, String>;
 
 pub fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
+    static TALKGROUP_INDEX: AtomicUsize = AtomicUsize::new(1);
     let talkgroup = DmrTalkgroup {
+        index: TALKGROUP_INDEX.fetch_add(1, Ordering::Relaxed),
         id: record.get("ID").unwrap().parse()?,
         name: record.get("Contact Name").unwrap().to_string(),
         call_type: match record.get("ID Type").unwrap().as_str() {
@@ -99,13 +102,16 @@ pub fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgr
             "AllCall" => DmrTalkgroupCallType::AllCall,
             _ => return Err(format!("Unrecognized call type: {}", record.get("Call Type").unwrap()).into()),
         },
+        alert: false, // not supported
     };
     Ok(talkgroup)
 }
 
 pub fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<DmrTalkgroupList, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
+    static TALKGROUP_LIST_INDEX: AtomicUsize = AtomicUsize::new(1);
     let mut talkgroup_list = DmrTalkgroupList {
+        index: TALKGROUP_LIST_INDEX.fetch_add(1, Ordering::Relaxed),
         name: record.get("TG List Name").unwrap().to_string(),
         talkgroups: Vec::new(),
     };
@@ -186,7 +192,7 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
     let mut channel = Channel::default();
 
     // shared fields
-    channel.index = record.get("Channel Number").unwrap().parse::<u32>()?;
+    channel.index = record.get("Channel Number").unwrap().parse::<usize>()?;
     channel.name = record.get("Channel Name").unwrap().to_string();
     channel.mode = match record.get("Channel Type").unwrap().as_str() {
         "Analogue" => ChannelMode::FM,
@@ -239,7 +245,9 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
 
 pub fn parse_zone_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<Zone, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
+    static ZONE_INDEX: AtomicUsize = AtomicUsize::new(1);
     let mut zone = Zone {
+        index: ZONE_INDEX.fetch_add(1, Ordering::Relaxed),
         name: record.get("Zone Name").unwrap().to_string(),
         channels: Vec::new(),
     };

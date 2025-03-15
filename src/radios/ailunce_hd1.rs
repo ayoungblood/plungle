@@ -118,7 +118,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
     }
 
     // shared fields
-    channel.index = record.get("No.").unwrap().parse::<u32>()?;
+    channel.index = record.get("No.").unwrap().parse::<usize>()?;
     channel.name = record.get("Channel Alias").unwrap().to_string();
     channel.mode = match record.get("Channel Type").unwrap().as_str() {
         "Analog CH" => ChannelMode::FM,
