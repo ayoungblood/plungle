@@ -120,7 +120,7 @@ pub fn get_props() -> &'static structures::RadioProperties {
 // - Radio ID: DMR talkgroup ID
 // - Name: DMR talkgroup name
 // - Call Type: [Group Call, All Call, Private Call]
-// - Call Alert: [None, ??]
+// - Call Alert: [None,Ring,Online Alert] for private call, None for group/all call
 
 // Zone.CSV
 // - No.: zone index
@@ -185,7 +185,7 @@ fn parse_tx_permit(tx_permit: &str) -> Option<TxPermit> {
 }
 
 // Convert a CTCSS/DCS string into a Tone struct
-// Anytone stores CTCSS/DCS as follows:
+// CTCSS/DCS is stored as follows:
 // - "Off" for no tone
 // - "100" or "141.3" for CTCSS frequency (decimal point may or may not be present)
 // - "D023N" or "D023I" for DCS code (N for normal, I for inverted)
@@ -906,7 +906,7 @@ pub fn write_radio_id_list(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Re
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
-        .quote_style(csv::QuoteStyle::Always) // Anytone CPS expects all fields to be quoted
+        .quote_style(csv::QuoteStyle::Always) // CPS expects all fields to be quoted
         .terminator(csv::Terminator::CRLF)
         .from_path(path)?;
 
