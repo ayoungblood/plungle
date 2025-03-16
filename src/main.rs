@@ -16,6 +16,7 @@ mod structures;
 mod validate;
 mod bandplan;
 mod printer;
+mod merge;
 
 #[derive(Debug, Parser)]
 #[clap(version, author, about = "Codeplug conversion tool")]
@@ -171,9 +172,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             // generate codeplug
             radios::generate_codeplug(&opt, &codeplug, &model, &output)?;
         }
-        Some(Commands::Merge { inputs: _ }) => {
-            // @TODO implement merge
-            uprintln!(opt, Stderr, Color::Red, None, "merge - Operation unsupported!");
+        Some(Commands::Merge { inputs }) => {
+            // merge codeplugs
+            let codeplug = merge::merge_codeplug(&opt, &inputs)?;
+            // write intermediary file
+            write_codeplug(&opt, &None, &codeplug)?; // @TODO FIXME
         }
         None => { // this should never happen because of arg_required_else_help
             uprintln!(opt, Stderr, Color::Red, None, "No command specified");
