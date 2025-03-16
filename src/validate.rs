@@ -2,6 +2,7 @@
 
 use rust_decimal::prelude::*;
 use crate::*;
+use crate::structures::Codeplug;
 use crate::bandplan::Bandplan;
 
 /// Severity
@@ -23,7 +24,7 @@ pub struct Complaint {
 }
 
 // this function performs validation steps that are common across all radios
-pub fn validate_generic(codeplug: &structures::Codeplug, bandplan: &Bandplan, opt: &Opt) -> Result<Vec<Complaint>, Box<dyn Error>> {
+pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &Bandplan) -> Result<Vec<Complaint>, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Validating codeplug against bandplan: {} (source: {})", bandplan.name, bandplan.source.as_ref().unwrap());
     let mut complaints: Vec<Complaint> = Vec::new();
@@ -134,7 +135,7 @@ pub fn validate_generic(codeplug: &structures::Codeplug, bandplan: &Bandplan, op
     Ok(complaints)
 }
 
-pub fn validate_specific(codeplug: &structures::Codeplug, props: &structures::RadioProperties, opt: &Opt) -> Result<Vec<Complaint>, Box<dyn Error>> {
+pub fn validate_specific(opt: &Opt, codeplug: &structures::Codeplug, props: &structures::RadioProperties) -> Result<Vec<Complaint>, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     let mut complaints: Vec<Complaint> = Vec::new();
     // check codeplug
@@ -187,7 +188,23 @@ pub fn validate_specific(codeplug: &structures::Codeplug, props: &structures::Ra
     Ok(complaints)
 }
 
-pub fn print_complaints(complaints: &Vec<Complaint>, opt: &Opt) {
+pub fn validate_codeplug(opt: &Opt, codeplug: &Codeplug, model: &String) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    let mut complaints: Vec<Complaint> = Vec::new();
+    // load a band plan
+    let bandplan = bandplan::load_bandplan(opt)?;
+    // generic validation
+    complaints.extend(validate_generic(opt, codeplug, &bandplan).unwrap());
+    // radio-specific validation
+    let properties = radios::get_properties(opt, model).unwrap();
+    // specific validation
+    complaints.extend(validate_specific(opt, codeplug, &properties).unwrap());
+    // combine the complaints
+    print_complaints(opt, &complaints);
+    Ok(())
+}
+
+pub fn print_complaints(opt: &Opt, complaints: &Vec<Complaint>) {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, Color::Magenta, None, "{:-^1$}", " Validation Output ", 79);
 

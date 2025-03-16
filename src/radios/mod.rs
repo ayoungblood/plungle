@@ -6,10 +6,6 @@ use std::collections::HashMap;
 use crate::Opt;
 use crate::structures::Codeplug;
 use crate::*;
-use crate::validate::validate_generic;
-use crate::validate::validate_specific;
-use crate::validate::Complaint;
-use crate::validate::print_complaints;
 
 mod anytone_x78;
 mod opengd77_rt3s;
@@ -91,20 +87,4 @@ pub fn get_properties(opt: &Opt, model: &String) -> Result<structures::RadioProp
         }
         return Err("Bad radio model".into());
     }
-}
-
-pub fn validate_codeplug(opt: &Opt, codeplug: &Codeplug, model: &String) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
-    let mut complaints: Vec<Complaint> = Vec::new();
-    // load a band plan
-    let bandplan = bandplan::load_bandplan(opt)?;
-    // generic validation
-    complaints.extend(validate_generic(codeplug, &bandplan, opt).unwrap());
-    // radio-specific validation
-    let properties = get_properties(opt, model).unwrap();
-    // specific validation
-    complaints.extend(validate_specific(codeplug, &properties, opt).unwrap());
-    // combine the complaints
-    print_complaints(&complaints, opt);
-    Ok(())
 }

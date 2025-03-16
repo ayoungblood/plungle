@@ -7,9 +7,21 @@ use clap::ValueEnum;
 #[clap(rename_all = "kebab_case")]
 pub enum Format {
     #[default]
+    Default,
     Json,
     Toml,
     Text,
+}
+
+impl std::fmt::Display for Format {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Format::Default => write!(f, "default"),
+            Format::Json => write!(f, "JSON"),
+            Format::Toml => write!(f, "TOML"),
+            Format::Text => write!(f, "text"),
+        }
+    }
 }
 
 #[derive(Debug)]
