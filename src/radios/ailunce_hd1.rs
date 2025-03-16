@@ -93,7 +93,7 @@ type CsvRecord = HashMap<String, String>;
 // - "62.5" or "123.0" for CTCSS tones
 // - "D023N" or "D754I" for DCS tones
 fn parse_tone(tone: &str) -> Option<Tone> {
-    if tone == "Off" {
+    if tone == "None" {
         return None;
     }
     // if string begins with D, it's DCS
