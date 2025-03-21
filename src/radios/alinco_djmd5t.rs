@@ -120,7 +120,7 @@ pub fn get_props() -> &'static structures::RadioProperties {
 // - Radio ID: DMR talkgroup ID
 // - Name: DMR talkgroup name
 // - Call Type: [Group Call, All Call, Private Call]
-// - Call Alert: [None, ??]
+// - Call Alert: [None,Ring,Online Alert] for private call, None for group/all call
 
 // Zone.CSV
 // - No.: zone index
