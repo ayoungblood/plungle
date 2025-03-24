@@ -1,0 +1,211 @@
+---
+version: 0.11.2
+settings:
+  introLine1: ""
+  introLine2: ""
+  micLevel: 3
+  speech: false
+  power: High
+  squelch: 2
+  vox: 0
+  tot: 0
+  defaultID: id1
+radioIDs:
+  - dmr: {id: id1, name: R, number: 654321}
+contacts:
+  - dmr: {id: cont1, name: LOCAL 2, ring: false, type: GroupCall, number: 2}
+  - dmr: {id: cont2, name: LOCAL 9, ring: false, type: GroupCall, number: 9}
+  - dmr: {id: cont3, name: BM Global, ring: false, type: GroupCall, number: 91}
+  - dmr: {id: cont4, name: BM NA, ring: false, type: GroupCall, number: 93}
+  - dmr: {id: cont5, name: BM KC Wide, ring: false, type: GroupCall, number: 313136}
+  - dmr: {id: cont6, name: BM Colorado Ring, ring: true, type: GroupCall, number: 3108}
+  - dmr: {id: cont7, name: 700 RMH Wide, ring: false, type: GroupCall, number: 700}
+  - dmr: {id: cont8, name: 705 RMH East, ring: false, type: GroupCall, number: 705}
+  - dmr: {id: cont9, name: 719 RMH South, ring: false, type: GroupCall, number: 719}
+  - dmr: {id: cont10, name: 720 RMH Central, ring: false, type: GroupCall, number: 720}
+  - dmr: {id: cont11, name: 721 RMH North, ring: false, type: GroupCall, number: 721}
+  - dmr: {id: cont12, name: Private123456, ring: false, type: PrivateCall, number: 123456}
+  - dmr: {id: cont13, name: ALL CALL, ring: false, type: AllCall, number: 16777215}
+  - dmr: {id: cont14, name: 4000 Disconnect, ring: false, type: GroupCall, number: 4000}
+groupLists:
+  - {id: grp1, name: RMHAM, contacts: [cont7, cont8, cont9, cont10, cont11]}
+  - {id: grp2, name: Brandmeister, contacts: [cont3, cont4, cont5, cont6, cont14]}
+channels:
+  - analog:
+      id: ch1
+      name: 2m Simplex
+      rxFrequency: 146.52000000000001
+      txFrequency: 146.52000000000001
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch2
+      name: 70cm Simplex
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch3
+      name: VA Rep T>T
+      rxFrequency: 145.11500000000001
+      txFrequency: 144.51499999999999
+      rxOnly: false
+      scanListRef: scan1
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      rxTone: {ctcss: 67}
+      txTone: {ctcss: 250.300003}
+      squelch: !<!default> ""
+  - analog:
+      id: ch4
+      name: VA Rep D>D
+      rxFrequency: 147.38999999999999
+      txFrequency: 147.99000000000001
+      rxOnly: false
+      scanListRef: scan1
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      rxTone: {dcs: 23}
+      txTone: {dcs: -754}
+      squelch: !<!default> ""
+  - analog:
+      id: ch5
+      name: VA PMax TOT60
+      rxFrequency: 145.13
+      txFrequency: 144.53
+      rxOnly: false
+      scanListRef: scan1
+      admit: Always
+      bandwidth: Wide
+      power: Max
+      timeout: 60
+      vox: !<!default> ""
+      rxTone: {ctcss: 100}
+      txTone: {dcs: 754}
+      squelch: !<!default> ""
+  - analog:
+      id: ch6
+      name: VA PMid TOToff
+      rxFrequency: 145.14500000000001
+      txFrequency: 144.54499999999999
+      rxOnly: false
+      scanListRef: scan1
+      admit: Always
+      bandwidth: Wide
+      power: Mid
+      timeout: 0
+      vox: !<!default> ""
+      rxTone: {ctcss: 123}
+      txTone: {dcs: -23}
+      squelch: !<!default> ""
+  - analog:
+      id: ch7
+      name: VA TXAcfree Sq1
+      rxFrequency: 145.16
+      txFrequency: 144.56
+      rxOnly: false
+      scanListRef: scan1
+      admit: Free
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: 1
+  - analog:
+      id: ch8
+      name: VA TXAtone SqOpen
+      rxFrequency: 145.17500000000001
+      txFrequency: 144.57499999999999
+      rxOnly: false
+      scanListRef: scan1
+      admit: Tone
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: 0
+  - digital:
+      id: ch9
+      name: UD S1CC1 TXAcfree
+      rxFrequency: 438.69999999999999
+      txFrequency: 433.69999999999999
+      rxOnly: false
+      admit: Free
+      colorCode: 1
+      timeSlot: TS1
+      radioId: !<!default> ""
+      contact: cont1
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+  - digital:
+      id: ch10
+      name: UD S2CC15 TXAcc
+      rxFrequency: 438.71249999999998
+      txFrequency: 433.71249999999998
+      rxOnly: false
+      admit: ColorCode
+      colorCode: 15
+      timeSlot: TS2
+      radioId: !<!default> ""
+      groupList: grp1
+      contact: cont7
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+  - digital:
+      id: ch11
+      name: UD S1CC7 RXO
+      rxFrequency: 438.72500000000002
+      txFrequency: 433.72500000000002
+      rxOnly: true
+      admit: Always
+      colorCode: 7
+      timeSlot: TS2
+      radioId: !<!default> ""
+      groupList: grp2
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+  - analog:
+      id: ch12
+      name: FRS 03
+      rxFrequency: 462.61250000000001
+      txFrequency: 462.61250000000001
+      rxOnly: false
+      admit: Always
+      bandwidth: Narrow
+      power: Low
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+zones:
+  []
+scanLists:
+  - id: scan1
+    name: VHF Repeater
+    channels: [ch3, ch4, ch5, ch6, ch7, ch8]
+  - id: scan2
+    name: DMR Repeater
+    channels: [ch9, ch10, ch11]
+commercial:
+  encryptionKeys:
+    []
+...
