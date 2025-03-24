@@ -4,8 +4,8 @@ use std::error::Error;
 //use std::fs;
 use std::path::PathBuf;
 use std::path::Path;
-//use std::collections::HashMap;
-use rust_decimal::prelude::*;
+use std::collections::HashMap;
+// use rust_decimal::prelude::*;
 use std::sync::OnceLock;
 // use std::fs::File;
 // use std::io::BufReader;
@@ -51,25 +51,44 @@ pub fn get_props() -> &'static structures::RadioProperties {
 //   <CP_TOT> - transmit timeout timer in seconds, Applicable=Disabled for receive-only channels
 //   <CP_TXPWR> - transmit power, HIGHPWR or LOWPWR, Applicable=Disabled for receive-only channels
 //   <CP_USELD> - not sure what this is but it changes when it shouldn't [OFF, ON]
+// Because the order of tags is not consistent, we read every element into a hashmap, and then parse the channel data from the hashmap
+// This separates the XML parsing from the channel parsing, which is useful for debugging, and is useful when a field value is dependent on multiple tag values
+#[derive(Debug)]
+enum XmlApplicable {
+    Enabled,
+    Disabled,
+    Na,
+}
+#[derive(Debug)]
+struct XmlChannelFieldContent {
+    value: String,
+    type_id: Option<String>,
+    applicable: XmlApplicable,
+    list_id: usize,
+}
+
+type XmlChannelHash = HashMap<String, XmlChannelFieldContent>;
 
 // READ ///////////////////////////////////////////////////////////////////////
 
-fn get_list_id(e: &quick_xml::events::BytesStart) -> Option<u32> {
+fn get_list_id(e: &quick_xml::events::BytesStart) -> Option<usize> {
     for attr in e.attributes() {
         let a = attr.unwrap();
         if a.key == QName(b"ListID") {
-            return Some(std::str::from_utf8(&a.value).unwrap().parse::<u32>().unwrap());
+            return Some(std::str::from_utf8(&a.value).unwrap().parse::<usize>().unwrap());
         }
     }
     None
 }
 
-fn parse_channel_record(opt: &Opt, id: u32, contents: &str) -> Result<Channel, Box<dyn Error>> {
+fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     let mut channel = Channel::default();
     channel.index = id + 1; // channels are zero-indexed in the XML
     // contents is a string of XML
     let mut reader = Reader::from_str(contents);
+    let mut channel_hash = XmlChannelHash::new();
+    eprintln!("contents = {}", contents);
     reader.config_mut().trim_text(true);
     let mut buf = Vec::new();
     loop {
@@ -77,62 +96,80 @@ fn parse_channel_record(opt: &Opt, id: u32, contents: &str) -> Result<Channel, B
             Err(e) => panic!("Error at position {}: {:?}", reader.error_position(), e),
             Ok(Event::Eof ) => break,
             Ok(Event::Start(e)) => {
-                // common channel attributes
-                match e.name().as_ref() {
-                    b"CP_PERSTYPE" => { // channel type
-                        let perstype = reader.read_text(QName(b"CP_PERSTYPE"))?.into_owned();
-                        if perstype == "ANLGCONV" {
-                            channel.mode = ChannelMode::FM;
-                        } else if perstype == "DGTLCONV6PT25" {
-                            channel.mode = ChannelMode::DMR;
-                        } else {
-                            panic!("Unknown channel type: {}", perstype);
+                // add to hashmap
+                let field = XmlChannelFieldContent {
+                    value: reader.read_text(e.name())?.into_owned(),
+                    type_id: e.attributes().find(|a| a.as_ref().unwrap().key == b"TypeID").map(|a| a.unwrap().value.to_vec()).map(|v| String::from_utf8(v).unwrap()),
+                    applicable: e.attributes().find(|a| a.as_ref().unwrap().key == b"Applicable").map(|a| a.unwrap().value).map(|v| {
+                        match std::str::from_utf8(v).unwrap() {
+                            "Enabled" => XmlApplicable::Enabled,
+                            "Disabled" => XmlApplicable::Disabled,
+                            "NA" => XmlApplicable::Na,
+                            _ => panic!("Unknown Applicable value: {}", std::str::from_utf8(v).unwrap()),
                         }
-                    }
-                    b"CP_CNVPERSALIAS" => { // channel name
-                        channel.name = reader.read_text(QName(b"CP_CNVPERSALIAS"))?.into_owned();
-                    },
-                    b"CP_RXFREQ" => { // receive frequency
-                        let freq_str = reader.read_text(QName(b"CP_RXFREQ"))?.into_owned();
-                        channel.frequency_rx = Decimal::from_str(&freq_str)? * Decimal::new(1_000_000, 0);
-                    },
-                    b"CP_TXFREQ" => { // transmit frequency
-                        let freq_str = reader.read_text(QName(b"CP_TXFREQ"))?.into_owned();
-                        channel.frequency_tx = Decimal::from_str(&freq_str)? * Decimal::new(1_000_000, 0);
-                    },
-                    b"CP_RXONLYEN" => { // receive only
-                        let rxonlyen = reader.read_text(QName(b"CP_RXONLYEN"))?.into_owned();
-                        channel.rx_only = rxonlyen == "1";
-                    },
-                    b"CP_TOT" => { // TOT
-                        let tot = reader.read_text(QName(b"CP_TOT"))?.into_owned();
-                        channel.tx_tot = Timeout { default: false, seconds: Some(tot.parse::<u32>().unwrap()) };
-                    },
-                    b"CP_TXPWR" => { // power
-                        let txpwr = reader.read_text(QName(b"CP_TXPWR"))?.into_owned();
-                        let mhz_rx = channel.frequency_rx.to_f64().unwrap() / 1_000_000.0;
-                        channel.power = if txpwr == "HIGHPWR" {
-                            if mhz_rx > 136.0 && mhz_rx < 174.0 {
-                                Power { default: false, watts: Some(Decimal::new(5, 0)) }
-                            } else if mhz_rx >= 403.0 && mhz_rx <= 512.0 {
-                                Power { default: false, watts: Some(Decimal::new(4, 0)) }
-                            } else if (mhz_rx >= 806.0 && mhz_rx <= 825.0) || (mhz_rx >= 851.0 && mhz_rx <= 870.0) {
-                                Power { default: false, watts: Some(Decimal::new(25, 1)) }
-                            } else if (mhz_rx >= 896.0 && mhz_rx <= 902.0) || (mhz_rx >= 934.0 && mhz_rx <= 941.0) {
-                                Power { default: false, watts: Some(Decimal::new(25, 1)) }
-                            } else {
-                                return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Unknown frequency range for power: {}", mhz_rx))));
-                            }
-                        } else {
-                            Power { default: false, watts: Some(Decimal::new(1, 0)) }
-                        };
-                    },
-                    b"CP_TXINHXPLEN" => {
-                        // @TODO: implement
-                    },
-                    // @TODO implement scan
-                    _ => {},
-                }
+                    }).unwrap(),
+                    list_id: e.attributes().find(|a| a.as_ref().unwrap().key == b"ListID").map(|a| a.unwrap().value).map(|v| std::str::from_utf8(v).unwrap().parse::<usize>().unwrap()).unwrap(),
+                };
+                println!("e.name = {:?}", e.name());
+                println!("    value = {:?}", reader.read_text(e.name())?.into_owned());
+                println!("    attributes = {:?}", e.attributes().map(|a| a.unwrap()).collect::<Vec<_>>());
+                // // common channel attributes
+                // match e.name().as_ref() {
+                //     b"CP_PERSTYPE" => { // channel type
+                //         let perstype = reader.read_text(QName(b"CP_PERSTYPE"))?.into_owned();
+                //         if perstype == "ANLGCONV" {
+                //             channel.mode = ChannelMode::FM;
+                //         } else if perstype == "DGTLCONV6PT25" {
+                //             channel.mode = ChannelMode::DMR;
+                //         } else {
+                //             panic!("Unknown channel type: {}", perstype);
+                //         }
+                //     }
+                //     b"CP_CNVPERSALIAS" => { // channel name
+                //         channel.name = reader.read_text(QName(b"CP_CNVPERSALIAS"))?.into_owned();
+                //     },
+                //     b"CP_RXFREQ" => { // receive frequency
+                //         let freq_str = reader.read_text(QName(b"CP_RXFREQ"))?.into_owned();
+                //         channel.frequency_rx = Decimal::from_str(&freq_str)? * Decimal::new(1_000_000, 0);
+                //     },
+                //     b"CP_TXFREQ" => { // transmit frequency
+                //         let freq_str = reader.read_text(QName(b"CP_TXFREQ"))?.into_owned();
+                //         channel.frequency_tx = Decimal::from_str(&freq_str)? * Decimal::new(1_000_000, 0);
+                //     },
+                //     b"CP_RXONLYEN" => { // receive only
+                //         let rxonlyen = reader.read_text(QName(b"CP_RXONLYEN"))?.into_owned();
+                //         channel.rx_only = rxonlyen == "1";
+                //     },
+                //     b"CP_TOT" => { // TOT
+                //         let tot = reader.read_text(QName(b"CP_TOT"))?.into_owned();
+                //         channel.tx_tot = Timeout::Seconds(tot.parse::<u32>().unwrap());
+                //     },
+                //     b"CP_TXPWR" => { // power
+                //         let txpwr = reader.read_text(QName(b"CP_TXPWR"))?.into_owned();
+                //         let mhz_tx = channel.frequency_tx.to_f64().unwrap() / 1_000_000.0;
+
+                //         channel.power = if txpwr == "HIGHPWR" {
+                //             if mhz_tx > 136.0 && mhz_tx < 174.0 {
+                //                 Power::Watts(5.0)
+                //             } else if mhz_tx >= 403.0 && mhz_tx <= 512.0 {
+                //                 Power::Watts(4.0)
+                //             } else if (mhz_tx >= 806.0 && mhz_tx <= 825.0) || (mhz_tx >= 851.0 && mhz_tx <= 870.0) {
+                //                 Power::Watts(2.5)
+                //             } else if (mhz_tx >= 896.0 && mhz_tx <= 902.0) || (mhz_tx >= 934.0 && mhz_tx <= 941.0) {
+                //                 Power::Watts(2.5)
+                //             } else {
+                //                 return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Unknown frequency range for power: {}", mhz_rx))));
+                //             }
+                //         } else {
+                //             Power::Watts(1.0)
+                //         };
+                //     },
+                //     b"CP_TXINHXPLEN" => {
+                //         // @TODO: implement
+                //     },
+                //     // @TODO implement scan
+                //     _ => {},
+                // }
             }
             _ => (),
         }
