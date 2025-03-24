@@ -4,7 +4,8 @@
 
 ## Limitations
 
-The MD-UV380 CPS V2.41 (current as of 2025-02-25) has severe limitations for CSV import/export. Only the channels and talkgroups (contacts) support import/export. Zones, scanlists, radio IDs, and talkgroup lists must all be managed manually. It is highly recommended that you flash this radio with [OpenGD77](https://www.opengd77.com/) or [OpenRTX](https://openrtx.org/). Nevertheless, the factory CPS V2.41 is supported (model `tyt_mduv390`) if you must use the stock firmware.
+The MD-UV380 CPS V2.41 (current as of 2025-02-25) has severe limitations for CSV import/export. Only the channels and talkgroups (contacts) support import/export. Zones, scanlists, radio IDs, and talkgroup lists must all be managed manually. It is highly recommended that you flash this radio with [OpenGD77](https://www.opengd77.com/).  
+Nevertheless, the factory CPS V2.41 is supported (model `tyt_mduv390`) if you must use the stock firmware, or if you are using [OpenRTX](https://openrtx.org/) which depends on the factory CPS.
 
 # TYT MD-UV390
 
