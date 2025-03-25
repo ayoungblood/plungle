@@ -73,7 +73,7 @@ fn pretty_tone(tone: &Option<Tone>) -> String {
 fn pretty_channel(_opt: &Opt, channel: &Channel) -> String {
     let mut line = String::new();
     // print common stuff
-    line.push_str(&format!("    "));
+    line.push_str(&format!("CHAN "));
     line.push_str(&format!("{:4} ", channel.index));
     line.push_str(&format!("{:16} ", channel.name));
     line.push_str(&format!("{:4} ", format!("{:?}",channel.mode)));
@@ -120,7 +120,7 @@ fn print_channels(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Erro
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
-    output.push_str(&format!("     {:4} {:16} {:4} {:12} {:12} {:3} {:4} {:5} {:7} {:16}\n",
+    output.push_str(&format!("\nCHAN:{:4} {:16} {:4} {:12} {:12} {:3} {:4} {:5} {:7} {:16}\n",
         "idx", "name", "mode", "rxf", "txf", "rxo", "tot", "power", "txprmit", "scan"));
     for channel in &codeplug.channels {
         output.push_str(&pretty_channel(opt, channel));
@@ -134,11 +134,10 @@ fn print_zones(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>>
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
-    output.push_str(&format!("Zones\n"));
-    output.push_str(&format!("    {:3} {:16} {:3} {}\n",
+    output.push_str(&format!("\nZONE:{:3} {:16} {:3} {}\n",
         "idx", "name", "len", "channels"));
     for zone in &codeplug.zones {
-        output.push_str(&format!("    {:3} {:16} {:3} {}\n",
+        output.push_str(&format!("ZONE {:3} {:16} {:3} {}\n",
             zone.index,
             zone.name,
             zone.channels.len(),
@@ -153,7 +152,7 @@ fn print_scanlists(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Err
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
-    output.push_str(&format!("     {:3} {:16} {:3} {}\n",
+    output.push_str(&format!("\nSCAN:{:3} {:16} {:3} {}\n",
         "idx", "name", "len", "channels"));
     for scanlist in &codeplug.scanlists {
         output.push_str(&format!("SCAN {:3} {:16} {:3} {}\n",
@@ -171,11 +170,10 @@ fn print_talkgroups(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Er
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
-    output.push_str(&format!("Talkgroups\n"));
-    output.push_str(&format!("    {:3} {:16} {:8} {:4}\n",
+    output.push_str(&format!("\nTGRP:{:3} {:16} {:8} {:4}\n",
         "idx", "name", "id", "type"));
     for tg in &codeplug.talkgroups {
-        output.push_str(&format!("    {:3} {:16} {:8} {:4}\n",
+        output.push_str(&format!("TGRP {:3} {:16} {:8} {:4}\n",
             tg.index,
             tg.name,
             tg.id,
@@ -194,16 +192,37 @@ fn print_talkgroup_lists(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<d
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
-    output.push_str(&format!("Talkgroup Lists\n"));
-    output.push_str(&format!("    {:3} {:16} {:3} {}\n",
+    output.push_str(&format!("\nTGPL:{:3} {:16} {:3} {}\n",
         "idx", "name", "len", "talkgroups"));
     for tg in &codeplug.talkgroup_lists {
-        output.push_str(&format!("    {:3} {:16} {:3} {}\n",
+        output.push_str(&format!("TGPL {:3} {:16} {:3} {}\n",
             tg.index,
             tg.name,
             tg.talkgroups.len(),
             tg.talkgroups.iter().map(|tg| tg.name.to_string()).collect::<Vec<String>>().join(", "),
         ));
+    }
+
+    Ok(output)
+}
+
+fn print_config(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+
+    let mut output = String::new();
+    if let Some(config) = &codeplug.config {
+        output.push_str(&format!("CONFIG\n"));
+        if let Some(dmr_config) = &config.dmr_configuration {
+            output.push_str(&format!("  DMR\n"));
+            for id in &dmr_config.id_list {
+                output.push_str(&format!("    ID {:8} {:16}\n",
+                    id.id,
+                    id.name,
+                ));
+            }
+        }
+    } else {
+        output.push_str(&format!("CFG none"));
     }
 
     Ok(output)
@@ -219,7 +238,9 @@ pub fn pretty(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>> 
     output.push_str(print_scanlists(opt, codeplug).unwrap().as_str());
     output.push_str(print_talkgroups(opt, codeplug).unwrap().as_str());
     output.push_str(print_talkgroup_lists(opt, codeplug).unwrap().as_str());
-    output.push_str(&format!("Source: {}\n", codeplug.source));
+    output.push_str(&format!("\n"));
+    output.push_str(print_config(opt, codeplug).unwrap().as_str());
+    output.push_str(&format!("\nSRC {}\n", codeplug.source));
 
     Ok(output)
 }
