@@ -3,11 +3,12 @@
 use std::error::Error;
 // use std::fs;
 use std::path::PathBuf;
-use std::path::Path;
-use std::collections::HashMap;
-use rust_decimal::prelude::*;
+// use std::path::Path;
+// use std::collections::HashMap;
+// use rust_decimal::prelude::*;
 use std::sync::OnceLock;
-use std::cmp::{max, min};
+// use std::cmp::{max, min};
+use saphyr::{Yaml};
 
 use crate::*;
 use crate::structures::*;
@@ -87,14 +88,29 @@ pub fn get_props() -> &'static structures::RadioProperties {
 //     []
 // ...
 
+// READ ///////////////////////////////////////////////////////////////////////
+
 pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
-    let codeplug = Codeplug::default();
+    let mut codeplug = Codeplug::default();
+
+    // check that the input path is a file
+    if !input_path.is_file() {
+        uprintln!(opt, Stderr, Color::Red, None, "You lied to me when you told me this was a file: {}", input_path.display());
+        return Err("Bad input path".into());
+    }
+
+    uprintln!(opt, Stderr, None, 3, "Reading {}", input_path.display());
+    let yaml_str = std::fs::read_to_string(input_path)?;
+    let yaml = &(Yaml::load_from_str(&yaml_str)?)[0];
+
+    codeplug.source = format!("qdmr_v{}", yaml["version"].as_str().unwrap_or("ERR"));
 
     Ok(codeplug)
 }
 
+// WRITE //////////////////////////////////////////////////////////////////////
 
 
