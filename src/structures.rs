@@ -74,11 +74,18 @@ pub enum TxPermit {
     ColorCodeDifferent,
 }
 
+/// ScanSkip
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct ScanSkip {
+    pub zone: bool,
+    pub all: bool,
+}
+
 /// Scan
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
-pub struct Scan {
-    pub zone_skip: bool,
-    pub all_skip: bool,
+pub enum Scan {
+    Skip(ScanSkip),
+    ScanList(String),
 }
 
 /// Channel
@@ -133,6 +140,14 @@ pub struct DmrTalkgroupList {
     pub talkgroups: Vec<DmrTalkgroup>,
 }
 
+/// Scan List
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+pub struct ScanList {
+    pub index: usize,
+    pub name: String,
+    pub channels: Vec<String>,
+}
+
 /// DMR ID
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct DmrId {
@@ -157,6 +172,7 @@ pub struct Configuration {
 pub struct Codeplug {
     pub channels: Vec<Channel>,
     pub zones: Vec<Zone>,
+    pub scanlists: Vec<ScanList>,
     pub talkgroups: Vec<DmrTalkgroup>,
     pub talkgroup_lists: Vec<DmrTalkgroupList>,
     pub config: Option<Configuration>,

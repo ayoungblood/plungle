@@ -173,14 +173,8 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
-    let mut codeplug = Codeplug {
-        channels: Vec::new(),
-        zones: Vec::new(),
-        talkgroups: Vec::new(),
-        talkgroup_lists: Vec::new(),
-        config: None,
-        source: format!("{}", Path::new(file!()).file_stem().unwrap().to_str().unwrap()),
-    };
+    let mut codeplug = Codeplug::default();
+    codeplug.source = format!("{}", Path::new(file!()).file_stem().unwrap().to_str().unwrap());
 
     // check that the input path is a directory
     if !input_path.is_dir() {
