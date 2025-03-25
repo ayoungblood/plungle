@@ -209,10 +209,10 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
     }
     channel.power = parse_power(record.get("Power").unwrap().as_str());
     if record.get("Zone Skip").unwrap() == "Yes" || record.get("All Skip").unwrap() == "Yes" {
-        channel.scan = Some(Scan {
-            zone_skip: record.get("Zone Skip").unwrap() == "Yes",
-            all_skip: record.get("All Skip").unwrap() == "Yes",
-        });
+        channel.scan = Some(Scan::Skip(ScanSkip {
+            zone: record.get("Zone Skip").unwrap() == "Yes",
+            all: record.get("All Skip").unwrap() == "Yes",
+        }));
     }
 
     if channel.mode == ChannelMode::FM { // FM specific fields
@@ -272,14 +272,8 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
-    let mut codeplug = Codeplug {
-        channels: Vec::new(),
-        zones: Vec::new(),
-        talkgroups: Vec::new(),
-        talkgroup_lists: Vec::new(),
-        config: None,
-        source: format!("{}", Path::new(file!()).file_stem().unwrap().to_str().unwrap()),
-    };
+    let mut codeplug = Codeplug::default();
+    codeplug.source = format!("{}", Path::new(file!()).file_stem().unwrap().to_str().unwrap());
 
     // check that the input path is a directory
     if !input_path.is_dir() {
@@ -546,8 +540,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 write_squelch(&channel.fm.as_ref().unwrap().squelch), // Squelch
                 write_power(&channel.power), // Power
                 if channel.rx_only { "Yes".to_string() } else { "No".to_string() },
-                if channel.scan.is_some() && channel.scan.as_ref().unwrap().zone_skip { "Yes".to_string() } else { "No".to_string() }, // Zone Skip
-                if channel.scan.is_some() && channel.scan.as_ref().unwrap().all_skip { "Yes".to_string() } else { "No".to_string() }, // All Skip
+                if let Some(Scan::Skip(skip)) = &channel.scan { if skip.zone { "Yes".to_string() } else { "No".to_string() } } else { "No".to_string() }, // Zone Skip
+                if let Some(Scan::Skip(skip)) = &channel.scan { if skip.all { "Yes".to_string() } else { "No".to_string() } } else { "No".to_string() }, // All Skip
                 write_tx_tot(&channel.tx_tot), // TOT
                 "Off".to_string(), // VOX
                 "No".to_string(), // No Beep
@@ -586,8 +580,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 "".to_string(), // Squelch
                 write_power(&channel.power), // Power
                 if channel.rx_only { "Yes".to_string() } else { "No".to_string() },
-                if channel.scan.is_some() && channel.scan.as_ref().unwrap().zone_skip { "Yes".to_string() } else { "No".to_string() }, // Zone Skip
-                if channel.scan.is_some() && channel.scan.as_ref().unwrap().all_skip { "Yes".to_string() } else { "No".to_string() }, // All Skip
+                if let Some(Scan::Skip(skip)) = &channel.scan { if skip.zone { "Yes".to_string() } else { "No".to_string() } } else { "No".to_string() }, // Zone Skip
+                if let Some(Scan::Skip(skip)) = &channel.scan { if skip.all { "Yes".to_string() } else { "No".to_string() } } else { "No".to_string() }, // All Skip
                 write_tx_tot(&channel.tx_tot), // TOT
                 "Off".to_string(), // VOX
                 "No".to_string(), // No Beep

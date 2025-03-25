@@ -275,6 +275,10 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
         };
     }
     channel.tx_permit = parse_tx_permit(record.get("Busy Lock/TX Permit").unwrap());
+    channel.scan = match record.get("Scan List").unwrap().as_str() {
+        "None" => None,
+        _ => Some(Scan::ScanList(record.get("Scan List").unwrap().to_string())),
+    };
     if channel.mode == ChannelMode::FM { // FM specific fields
         channel.fm = Some(FmChannel {
             bandwidth: match record.get("Band Width").unwrap().as_str() {
@@ -338,6 +342,30 @@ fn parse_zone_record(csv_zone: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Re
     Ok(zone)
 }
 
+// Convert the CSV scanlist hashmap into a ScanList struct
+fn parse_scanlist_record(csv_scanlist: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<ScanList, Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 4, "    {:?}", csv_scanlist);
+    static SCANLIST_INDEX: AtomicUsize = AtomicUsize::new(1);
+    let mut scanlist = ScanList {
+        index: SCANLIST_INDEX.fetch_add(1, Ordering::Relaxed),
+        name: csv_scanlist.get("Scan List Name").unwrap().to_string(),
+        channels: Vec::new(),
+    };
+
+    // Channels are stored as a list of names, separated by "|"
+    let channel_names: Vec<&str> = csv_scanlist.get("Scan Channel Member").unwrap().split('|').collect();
+    for name in channel_names {
+        // find the channel by name in the codeplug
+        let channel = codeplug.channels.iter().find(|&c| c.name == name);
+        match channel {
+            Some(c) => scanlist.channels.push(c.name.clone()),
+            None => return Err(format!("Channel not found: {}", name).into()),
+        }
+    }
+
+    Ok(scanlist)
+}
+
 // Convert the CSV DMR ID hashmap into a DMRId struct
 fn parse_dmr_id_record(csv_dmr_id: &CsvRecord, opt: &Opt) -> Result<DmrId, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", csv_dmr_id);
@@ -353,14 +381,8 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
-    let mut codeplug = Codeplug {
-        channels: Vec::new(),
-        zones: Vec::new(),
-        talkgroups: Vec::new(),
-        talkgroup_lists: Vec::new(),
-        config: None,
-        source: format!("{}", Path::new(file!()).file_stem().unwrap().to_str().unwrap()),
-    };
+    let mut codeplug: Codeplug = Codeplug::default();
+    codeplug.source = format!("{}", Path::new(file!()).file_stem().unwrap().to_str().unwrap());
 
     // check that the input path is a directory
     if !input_path.is_dir() {
@@ -441,6 +463,22 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
             let zone = parse_zone_record(&record, &codeplug, &opt)?;
             // append to codeplug.zones
             codeplug.zones.push(zone);
+        }
+    }
+
+    // Check for ScanList.CSV
+    let mut scanlists_path: PathBuf = input_path.clone();
+    scanlists_path.push("ScanList.CSV");
+    // if ScanList.CSV doesn't exist, no problem, we just don't have any scanlists
+    if scanlists_path.exists() {
+        uprintln!(opt, Stderr, None, 3, "Reading {}", scanlists_path.display());
+        let mut reader = csv::Reader::from_path(scanlists_path)?;
+        for result in reader.deserialize() {
+            let record: CsvRecord = result?;
+            // convert from CSV record to ScanList struct
+            let scanlist = parse_scanlist_record(&record, &codeplug, &opt)?;
+            // append to codeplug.scanlists
+            codeplug.scanlists.push(scanlist);
         }
     }
 
@@ -1002,13 +1040,13 @@ pub fn write_scanlists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result
         "Dwell Time[s]",
     ])?;
 
-    for (ii, zone) in codeplug.zones.iter().enumerate() {
-        uprintln!(opt, Stderr, None, 4, "Writing scan list {:width$}: {}", ii + 1, zone.name, width = 3);
+    for (ii, scanlist) in codeplug.scanlists.iter().enumerate() {
+        uprintln!(opt, Stderr, None, 4, "Writing scan list {:width$}: {}", ii + 1, scanlist.name, width = 3);
         let mut channel_names = String::new();
         let mut channel_rx_frequencies = String::new();
         let mut channel_tx_frequencies = String::new();
         // a scan list can only have 50 or fewer channels
-        for (jj, name) in zone.channels.iter().take(50).enumerate() {
+        for (jj, name) in scanlist.channels.iter().take(50).enumerate() {
             if jj > 0 {
                 channel_names.push_str("|");
                 channel_rx_frequencies.push_str("|");
@@ -1022,7 +1060,7 @@ pub fn write_scanlists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result
 
         writer.write_record(&[
             format!("{}", ii + 1), // No.
-            zone.name.clone(), // Scan List Name
+            scanlist.name.clone(), // Scan List Name
             channel_names, // Scan Channel Member
             channel_rx_frequencies, // Scan Channel Member RX Frequency
             channel_tx_frequencies, // Scan Channel Member TX Frequency
@@ -1126,10 +1164,9 @@ pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<()
     }
 
     // write to ScanList.CSV
-    // Copy zones to scan lists since we don't support scan lists yet @TODO
     let mut scanlists_path: PathBuf = output_path.clone();
     scanlists_path.push("ScanList.CSV");
-    if codeplug.zones.len() > 0 {
+    if codeplug.scanlists.len() > 0 {
         write_scanlists(codeplug, &scanlists_path, opt)?;
     }
 

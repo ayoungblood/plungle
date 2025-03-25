@@ -36,10 +36,17 @@ fn pretty_tx_permit(tx_permit: &Option<TxPermit>) -> String {
 
 fn pretty_scan(scan: &Option<Scan>) -> String {
     if let Some(scan) = scan {
-        return format!("{:2}{:2}",
-            if scan.zone_skip { "ZS" } else { " " },
-            if scan.all_skip { "AS" } else { " " },
-        );
+        match scan {
+            Scan::Skip(skip) => {
+                return format!("skip: {:2}{:2}",
+                    if skip.zone { "ZS" } else { " " },
+                    if skip.all { "AS" } else { " " },
+                );
+            },
+            Scan::ScanList(name) => {
+                return format!("{}", name);
+            },
+        }
     } else {
         return "-".to_string();
     }
@@ -76,7 +83,7 @@ fn pretty_channel(_opt: &Opt, channel: &Channel) -> String {
     line.push_str(&format!("{:4} ", pretty_timeout(&channel.tx_tot)));
     line.push_str(&format!("{:5} ", pretty_power(&channel.power)));
     line.push_str(&format!("{:7} ", pretty_tx_permit(&channel.tx_permit)));
-    line.push_str(&format!("{:7} ", pretty_scan(&channel.scan)));
+    line.push_str(&format!("{:16} ", pretty_scan(&channel.scan)));
     // print mode specific stuff
     match channel.mode {
         ChannelMode::AM  => line.push_str(&format!(" ")),
@@ -113,8 +120,7 @@ fn print_channels(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Erro
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
-    output.push_str(&format!("Channels\n"));
-    output.push_str(&format!("    {:4} {:16} {:4} {:12} {:12} {:3} {:4} {:5} {:7} {:7}\n",
+    output.push_str(&format!("     {:4} {:16} {:4} {:12} {:12} {:3} {:4} {:5} {:7} {:16}\n",
         "idx", "name", "mode", "rxf", "txf", "rxo", "tot", "power", "txprmit", "scan"));
     for channel in &codeplug.channels {
         output.push_str(&pretty_channel(opt, channel));
@@ -137,6 +143,24 @@ fn print_zones(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>>
             zone.name,
             zone.channels.len(),
             zone.channels.iter().map(|ch| ch.to_string()).collect::<Vec<String>>().join(", "),
+        ));
+    }
+
+    Ok(output)
+}
+
+fn print_scanlists(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+
+    let mut output = String::new();
+    output.push_str(&format!("     {:3} {:16} {:3} {}\n",
+        "idx", "name", "len", "channels"));
+    for scanlist in &codeplug.scanlists {
+        output.push_str(&format!("SCAN {:3} {:16} {:3} {}\n",
+            scanlist.index,
+            scanlist.name,
+            scanlist.channels.len(),
+            scanlist.channels.iter().map(|ch| ch.to_string()).collect::<Vec<String>>().join(", "),
         ));
     }
 
@@ -192,6 +216,7 @@ pub fn pretty(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>> 
 
     output.push_str(print_channels(opt, codeplug).unwrap().as_str());
     output.push_str(print_zones(opt, codeplug).unwrap().as_str());
+    output.push_str(print_scanlists(opt, codeplug).unwrap().as_str());
     output.push_str(print_talkgroups(opt, codeplug).unwrap().as_str());
     output.push_str(print_talkgroup_lists(opt, codeplug).unwrap().as_str());
     output.push_str(&format!("Source: {}\n", codeplug.source));

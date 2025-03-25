@@ -172,13 +172,13 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
             _ => false,
         };
         channel.power = Power::Watts(record.get("Power").unwrap().strip_suffix("W").unwrap().parse::<f64>()?);
-        channel.scan = Some(Scan {
-            zone_skip: false, // Chirp doesn't support zones
-            all_skip: match record.get("Skip").unwrap().as_str() {
-                "S" => true,
-                _ => false,
+        channel.scan = Some(Scan::Skip(ScanSkip {
+            zone: false, // Chirp doesn't support zones
+            all: match record.get("Skip").unwrap().as_str() {
+            "S" => true,
+            _ => false,
             }
-        });
+        }));
         // FM specific properties
         let (tone_tx, tone_rx) = match parse_tones(record) {
             Ok((rx, tx)) => (rx, tx),
@@ -204,14 +204,8 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
-    let mut codeplug = Codeplug {
-        channels: Vec::new(),
-        zones: Vec::new(),
-        talkgroups: Vec::new(),
-        talkgroup_lists: Vec::new(),
-        config: None,
-        source: format!("{}", Path::new(file!()).file_stem().unwrap().to_str().unwrap()),
-    };
+    let mut codeplug = Codeplug::default();
+    codeplug.source = format!("{}", Path::new(file!()).file_stem().unwrap().to_str().unwrap());
 
     // check that the input path is a file
     if !input_path.is_file() {
@@ -608,10 +602,10 @@ fn write_channels(codeplug: &Codeplug, path: &Path, opt: &Opt) -> Result<(), Box
                 cross_mode, // CrossMode
                 write_mode(channel)?, // Mode
                 "5.00".to_string(), // TStep
-                match channel.scan.as_ref().unwrap().all_skip {
-                    true => "S",
-                    false => "",
-                }.to_string(), // Skip
+                match &channel.scan {
+                    Some(Scan::Skip(skip)) if skip.all => "S".to_string(),
+                    _ => "".to_string(),
+                }, // Skip
                 write_power(&channel.power), // Power
                 "".to_string(), // Comment
                 "".to_string(), // URCALL
