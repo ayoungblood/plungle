@@ -30,6 +30,10 @@ struct Opt {
     #[arg(short, long, default_value_t, value_enum, global=true)]
     color: clap::ColorChoice,
 
+    /// Quiet output
+    #[arg(short, long, action = clap::ArgAction::SetTrue, global=true)]
+    quiet: bool,
+
     /// Intermediary format
     #[arg(short = 'F', long, default_value_t, value_enum, global=true)]
     format: helpers::Format,
@@ -135,15 +139,15 @@ fn write_codeplug(opt: &Opt, output_path: &Option<PathBuf>, codeplug: &structure
 
     // write to file or stdout
     if output_path.is_none() {
-        uprintln!(opt, Stderr, Color::Green, None, "Writing codeplug to stdout (--format={})", format);
+        if !opt.quiet { uprintln!(opt, Stderr, Color::Green, None, "Writing codeplug to stdout (--format={})", format); }
         uprintln!(opt, Stdout, None, None, "{}", file_str);
     } else {
-        uprintln!(opt, Stderr, Color::Green, None, "Writing codeplug to {:?} (--format={})", output_path.as_ref().unwrap(), format);
+        if !opt.quiet { uprintln!(opt, Stderr, Color::Green, None, "Writing codeplug to {:?} (--format={})", output_path.as_ref().unwrap(), format); }
         std::fs::write(output_path.as_ref().unwrap(), file_str)?;
     }
 
-    uprintln!(opt, Stderr, Color::Cyan, None, "Codeplug has {} channels, {} zones, {} talkgroups, {} talkgroup lists",
-        codeplug.channels.len(), codeplug.zones.len(), codeplug.talkgroups.len(), codeplug.talkgroup_lists.len());
+    if !opt.quiet { uprintln!(opt, Stderr, Color::Cyan, None, "Codeplug has {} channels, {} zones, {} talkgroups, {} talkgroup lists",
+        codeplug.channels.len(), codeplug.zones.len(), codeplug.talkgroups.len(), codeplug.talkgroup_lists.len()); }
     Ok(())
 }
 

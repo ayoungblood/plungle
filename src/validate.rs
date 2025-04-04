@@ -200,7 +200,9 @@ pub fn validate_codeplug(opt: &Opt, codeplug: &Codeplug, model: &String) -> Resu
     // specific validation
     complaints.extend(validate_specific(opt, codeplug, &properties).unwrap());
     // combine the complaints
-    print_complaints(opt, &complaints);
+    if !opt.quiet { // suppress output if --quiet
+        print_complaints(opt, &complaints);
+    }
     Ok(())
 }
 
