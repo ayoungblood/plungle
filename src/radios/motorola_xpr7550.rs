@@ -88,7 +88,7 @@ fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel,
     // contents is a string of XML
     let mut reader = Reader::from_str(contents);
     let mut channel_hash = XmlChannelHash::new();
-    eprintln!("contents = {}", contents);
+    //eprintln!("contents = {}", contents);
     reader.config_mut().trim_text(true);
     let mut buf = Vec::new();
     loop {
@@ -99,8 +99,8 @@ fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel,
                 // add to hashmap
                 let field = XmlChannelFieldContent {
                     value: reader.read_text(e.name())?.into_owned(),
-                    type_id: e.attributes().find(|a| a.as_ref().unwrap().key == b"TypeID").map(|a| a.unwrap().value.to_vec()).map(|v| String::from_utf8(v).unwrap()),
-                    applicable: e.attributes().find(|a| a.as_ref().unwrap().key == b"Applicable").map(|a| a.unwrap().value).map(|v| {
+                    type_id: e.attributes().find(|a| a.as_ref().unwrap().key == quick_xml::name::QName(b"TypeID")).map(|a| a.unwrap().value.to_vec()).map(|v| String::from_utf8(v).unwrap()),
+                    applicable: e.attributes().find(|a| a.as_ref().unwrap().key == quick_xml::name::QName(b"Applicable")).map(|a| a.unwrap().value).as_ref().map(|v| {
                         match std::str::from_utf8(v).unwrap() {
                             "Enabled" => XmlApplicable::Enabled,
                             "Disabled" => XmlApplicable::Disabled,
@@ -108,11 +108,13 @@ fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel,
                             _ => panic!("Unknown Applicable value: {}", std::str::from_utf8(v).unwrap()),
                         }
                     }).unwrap(),
-                    list_id: e.attributes().find(|a| a.as_ref().unwrap().key == b"ListID").map(|a| a.unwrap().value).map(|v| std::str::from_utf8(v).unwrap().parse::<usize>().unwrap()).unwrap(),
+                    list_id: e.attributes().find(|a| a.as_ref().unwrap().key == quick_xml::name::QName(b"ListID")).map(|a| a.unwrap().value).as_ref().map(|v| std::str::from_utf8(v).unwrap().parse::<usize>().unwrap()).unwrap(),
                 };
                 println!("e.name = {:?}", e.name());
-                println!("    value = {:?}", reader.read_text(e.name())?.into_owned());
-                println!("    attributes = {:?}", e.attributes().map(|a| a.unwrap()).collect::<Vec<_>>());
+                // println!("    value = {:?}", reader.read_text(e.name())?.into_owned());
+                // println!("    attributes = {:?}", e.attributes().map(|a| a.unwrap()).collect::<Vec<_>>());
+                // add to the hashmap
+                channel_hash.insert(String::from_utf8_lossy(e.name().as_ref()).to_string(), field);
                 // // common channel attributes
                 // match e.name().as_ref() {
                 //     b"CP_PERSTYPE" => { // channel type
