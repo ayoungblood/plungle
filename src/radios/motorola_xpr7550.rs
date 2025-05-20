@@ -2,20 +2,21 @@
 
 use std::error::Error;
 //use std::fs;
-use std::path::PathBuf;
-use std::path::Path;
 use std::collections::HashMap;
+use std::path::Path;
+use std::path::PathBuf;
 // use rust_decimal::prelude::*;
 use std::sync::OnceLock;
 // use std::fs::File;
 // use std::io::BufReader;
+use itertools::Itertools;
 
-use quick_xml::events::{Event};
-use quick_xml::reader::Reader;
+use quick_xml::events::Event;
 use quick_xml::name::QName;
+use quick_xml::reader::Reader;
 
-use crate::*;
 use crate::structures::*;
+use crate::*;
 
 static PROPS: OnceLock<structures::RadioProperties> = OnceLock::new();
 pub fn get_props() -> &'static structures::RadioProperties {
@@ -53,7 +54,7 @@ pub fn get_props() -> &'static structures::RadioProperties {
 //   <CP_USELD> - not sure what this is but it changes when it shouldn't [OFF, ON]
 // Because the order of tags is not consistent, we read every element into a hashmap, and then parse the channel data from the hashmap
 // This separates the XML parsing from the channel parsing, which is useful for debugging, and is useful when a field value is dependent on multiple tag values
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 enum XmlApplicable {
     Enabled,
     Disabled,
@@ -75,7 +76,12 @@ fn get_list_id(e: &quick_xml::events::BytesStart) -> Option<usize> {
     for attr in e.attributes() {
         let a = attr.unwrap();
         if a.key == QName(b"ListID") {
-            return Some(std::str::from_utf8(&a.value).unwrap().parse::<usize>().unwrap());
+            return Some(
+                std::str::from_utf8(&a.value)
+                    .unwrap()
+                    .parse::<usize>()
+                    .unwrap(),
+            );
         }
     }
     None
@@ -85,7 +91,7 @@ fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel,
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     let mut channel = Channel::default();
     channel.index = id + 1; // channels are zero-indexed in the XML
-    // contents is a string of XML
+                            // contents is a string of XML
     let mut reader = Reader::from_str(contents);
     let mut channel_hash = XmlChannelHash::new();
     //eprintln!("contents = {}", contents);
@@ -94,86 +100,56 @@ fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel,
     loop {
         match reader.read_event_into(&mut buf) {
             Err(e) => panic!("Error at position {}: {:?}", reader.error_position(), e),
-            Ok(Event::Eof ) => break,
+            Ok(Event::Eof) => break,
             Ok(Event::Start(e)) => {
                 // add to hashmap
                 let field = XmlChannelFieldContent {
                     value: reader.read_text(e.name())?.into_owned(),
-                    type_id: e.attributes().find(|a| a.as_ref().unwrap().key == quick_xml::name::QName(b"TypeID")).map(|a| a.unwrap().value.to_vec()).map(|v| String::from_utf8(v).unwrap()),
-                    applicable: e.attributes().find(|a| a.as_ref().unwrap().key == quick_xml::name::QName(b"Applicable")).map(|a| a.unwrap().value).as_ref().map(|v| {
-                        match std::str::from_utf8(v).unwrap() {
+                    type_id: e
+                        .attributes()
+                        .find(|a| a.as_ref().unwrap().key == quick_xml::name::QName(b"TypeID"))
+                        .map(|a| a.unwrap().value.to_vec())
+                        .map(|v| String::from_utf8(v).unwrap()),
+                    applicable: e
+                        .attributes()
+                        .find(|a| a.as_ref().unwrap().key == quick_xml::name::QName(b"Applicable"))
+                        .map(|a| a.unwrap().value)
+                        .as_ref()
+                        .map(|v| match std::str::from_utf8(v).unwrap() {
                             "Enabled" => XmlApplicable::Enabled,
                             "Disabled" => XmlApplicable::Disabled,
                             "NA" => XmlApplicable::Na,
-                            _ => panic!("Unknown Applicable value: {}", std::str::from_utf8(v).unwrap()),
-                        }
-                    }).unwrap(),
-                    list_id: e.attributes().find(|a| a.as_ref().unwrap().key == quick_xml::name::QName(b"ListID")).map(|a| a.unwrap().value).as_ref().map(|v| std::str::from_utf8(v).unwrap().parse::<usize>().unwrap()).unwrap(),
+                            _ => panic!(
+                                "Unknown Applicable value: {}",
+                                std::str::from_utf8(v).unwrap()
+                            ),
+                        })
+                        .unwrap(),
+                    list_id: e
+                        .attributes()
+                        .find(|a| a.as_ref().unwrap().key == quick_xml::name::QName(b"ListID"))
+                        .map(|a| a.unwrap().value)
+                        .as_ref()
+                        .map(|v| std::str::from_utf8(v).unwrap().parse::<usize>().unwrap())
+                        .unwrap(),
                 };
-                println!("e.name = {:?}", e.name());
+                // println!("e.name = {:?}", e.name());
                 // println!("    value = {:?}", reader.read_text(e.name())?.into_owned());
                 // println!("    attributes = {:?}", e.attributes().map(|a| a.unwrap()).collect::<Vec<_>>());
                 // add to the hashmap
-                channel_hash.insert(String::from_utf8_lossy(e.name().as_ref()).to_string(), field);
-                // // common channel attributes
-                // match e.name().as_ref() {
-                //     b"CP_PERSTYPE" => { // channel type
-                //         let perstype = reader.read_text(QName(b"CP_PERSTYPE"))?.into_owned();
-                //         if perstype == "ANLGCONV" {
-                //             channel.mode = ChannelMode::FM;
-                //         } else if perstype == "DGTLCONV6PT25" {
-                //             channel.mode = ChannelMode::DMR;
-                //         } else {
-                //             panic!("Unknown channel type: {}", perstype);
-                //         }
-                //     }
-                //     b"CP_CNVPERSALIAS" => { // channel name
-                //         channel.name = reader.read_text(QName(b"CP_CNVPERSALIAS"))?.into_owned();
-                //     },
-                //     b"CP_RXFREQ" => { // receive frequency
-                //         let freq_str = reader.read_text(QName(b"CP_RXFREQ"))?.into_owned();
-                //         channel.frequency_rx = Decimal::from_str(&freq_str)? * Decimal::new(1_000_000, 0);
-                //     },
-                //     b"CP_TXFREQ" => { // transmit frequency
-                //         let freq_str = reader.read_text(QName(b"CP_TXFREQ"))?.into_owned();
-                //         channel.frequency_tx = Decimal::from_str(&freq_str)? * Decimal::new(1_000_000, 0);
-                //     },
-                //     b"CP_RXONLYEN" => { // receive only
-                //         let rxonlyen = reader.read_text(QName(b"CP_RXONLYEN"))?.into_owned();
-                //         channel.rx_only = rxonlyen == "1";
-                //     },
-                //     b"CP_TOT" => { // TOT
-                //         let tot = reader.read_text(QName(b"CP_TOT"))?.into_owned();
-                //         channel.tx_tot = Timeout::Seconds(tot.parse::<u32>().unwrap());
-                //     },
-                //     b"CP_TXPWR" => { // power
-                //         let txpwr = reader.read_text(QName(b"CP_TXPWR"))?.into_owned();
-                //         let mhz_tx = channel.frequency_tx.to_f64().unwrap() / 1_000_000.0;
-
-                //         channel.power = if txpwr == "HIGHPWR" {
-                //             if mhz_tx > 136.0 && mhz_tx < 174.0 {
-                //                 Power::Watts(5.0)
-                //             } else if mhz_tx >= 403.0 && mhz_tx <= 512.0 {
-                //                 Power::Watts(4.0)
-                //             } else if (mhz_tx >= 806.0 && mhz_tx <= 825.0) || (mhz_tx >= 851.0 && mhz_tx <= 870.0) {
-                //                 Power::Watts(2.5)
-                //             } else if (mhz_tx >= 896.0 && mhz_tx <= 902.0) || (mhz_tx >= 934.0 && mhz_tx <= 941.0) {
-                //                 Power::Watts(2.5)
-                //             } else {
-                //                 return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("Unknown frequency range for power: {}", mhz_rx))));
-                //             }
-                //         } else {
-                //             Power::Watts(1.0)
-                //         };
-                //     },
-                //     b"CP_TXINHXPLEN" => {
-                //         // @TODO: implement
-                //     },
-                //     // @TODO implement scan
-                //     _ => {},
-                // }
+                channel_hash.insert(
+                    String::from_utf8_lossy(e.name().as_ref()).to_string(),
+                    field,
+                );
             }
             _ => (),
+        }
+    }
+    // print out the channel_hash
+    for fieldname in channel_hash.keys().sorted() {
+        let field = channel_hash.get(fieldname).unwrap();
+        if field.applicable == XmlApplicable::Enabled {
+            println!("{:03} {:40} {:40}", field.list_id, fieldname, field.value);
         }
     }
     Ok(channel)
@@ -187,12 +163,25 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let mut codeplug = Codeplug::default();
-    codeplug.source = format!("{}", Path::new(file!()).file_stem().unwrap().to_str().unwrap());
+    codeplug.source = format!(
+        "{}",
+        Path::new(file!()).file_stem().unwrap().to_str().unwrap()
+    );
 
     // check that the input path is a file
     if !input_path.is_file() {
-        uprintln!(opt, Stderr, Color::Red, None, "You lied to me when you told me this was a file: {}", input_path.display());
-        return Err(Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, format!("{} is not a file", input_path.display()))));
+        uprintln!(
+            opt,
+            Stderr,
+            Color::Red,
+            None,
+            "You lied to me when you told me this was a file: {}",
+            input_path.display()
+        );
+        return Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("{} is not a file", input_path.display()),
+        )));
     }
     // set up the XML parser
     // let file = File::open(input_path)?;
@@ -216,12 +205,13 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
                         // this is the beginning of an analog channel
                         let id = get_list_id(&e);
                         if let Some(id) = id {
-                            let contents = reader.read_text(QName(b"CNV_PER_CMP_TYPE"))?.into_owned();
+                            let contents =
+                                reader.read_text(QName(b"CNV_PER_CMP_TYPE"))?.into_owned();
                             let channel = parse_channel_record(opt, id, &contents)?;
                             codeplug.channels.push(channel);
                         }
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
             }
             // There are several other `Event`s we do not consider here
