@@ -29,7 +29,7 @@ pub enum Tone {
 }
 
 /// Channel FM properties
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
 pub struct FmChannel {
     pub bandwidth: Frequency,
     pub squelch: Squelch,
@@ -38,7 +38,7 @@ pub struct FmChannel {
 }
 
 /// Channel DMR properties
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
 pub struct DmrChannel {
     pub timeslot: u8,
     pub color_code: u8,

@@ -1,15 +1,12 @@
 // src/radios/motorola_xpr7550.rs
 
 use std::error::Error;
-//use std::fs;
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
-// use rust_decimal::prelude::*;
 use std::sync::OnceLock;
-// use std::fs::File;
-// use std::io::BufReader;
 use itertools::Itertools;
+use escaper::decode_html;
 
 use quick_xml::events::Event;
 use quick_xml::name::QName;
@@ -17,6 +14,7 @@ use quick_xml::reader::Reader;
 
 use crate::structures::*;
 use crate::*;
+use frequency::Frequency;
 
 static PROPS: OnceLock<structures::RadioProperties> = OnceLock::new();
 pub fn get_props() -> &'static structures::RadioProperties {
@@ -149,8 +147,121 @@ fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel,
     for fieldname in channel_hash.keys().sorted() {
         let field = channel_hash.get(fieldname).unwrap();
         if field.applicable == XmlApplicable::Enabled {
-            println!("{:03} {:40} {:40}", field.list_id, fieldname, field.value);
+            println!("{:03} {:40} {:40} {:?}", field.list_id, fieldname, field.value, field.type_id);
         }
+    }
+    eprintln!("channel.index: {}, field.list_id: {}", channel.index, channel_hash.get("CP_TOT").unwrap().list_id);
+    // set channel parameters
+    // CP_CNVPERSALIAS: channel name, with HTML entities for special characters
+    channel.name = match decode_html(&channel_hash.get("CP_CNVPERSALIAS").unwrap().value.to_string()) {
+        Ok(s) => s,
+        Err(reason) => return Err(format!("Error {:?} while decoding channel name (bad CP_CNVPERSALIAS)", reason.kind).into()),
+    };
+    // CP_PERSTYPE: "ANLGCONV" for FM, "DGTLCONV6PT25" for DMR
+    let cp_perstype = channel_hash.get("CP_PERSTYPE");
+    channel.mode = match cp_perstype.unwrap().value.as_str() {
+        "ANLGCONV" => ChannelMode::FM,
+        "DGTLCONV6PT25" => ChannelMode::DMR,
+        _ => return Err(format!("Cannot parse mode (unrecognized CP_PERSTYPE): {}", cp_perstype.unwrap().value).into()),
+    };
+    // CP_RXFREQ: RX frequency in MHz
+    let cp_rxfreq_str = channel_hash.get("CP_RXFREQ").unwrap().value.trim();
+    channel.frequency_rx = Frequency::from_mhz_str(cp_rxfreq_str)?;
+    // CP_TXFREQ: TX frequency in MHz
+    let cp_txfreq_str = channel_hash.get("CP_TXFREQ").unwrap().value.trim();
+    channel.frequency_tx = Frequency::from_mhz_str(cp_txfreq_str)?;
+    // CP_RXONLYEN: "1" for receive-only, "0" otherwise
+    channel.rx_only = channel_hash.get("CP_RXONLYEN").unwrap().value.trim() == "1";
+    // CP_TOT: TX timeout in seconds, 0 for disabled
+    let cp_tot_str = channel_hash.get("CP_TOT").unwrap().value.trim();
+    if cp_tot_str == "0" {
+        channel.tx_tot = Timeout::Infinite;
+    } else {
+        channel.tx_tot = Timeout::Seconds(cp_tot_str.parse::<u32>()?);
+    }
+    // CP_TXPWR: transmit power, "LOWPWR" or "HIGHPWR"
+    // 800/900 - low 1.0W, high 2.5W
+    // UHF - low 1.0W, high 4.0W
+    // VHF - low 1.0W, high 5.0W
+    let cp_txpwr = channel_hash.get("CP_TXPWR");
+    if cp_txpwr.is_some() && cp_txpwr.unwrap().applicable == XmlApplicable::Enabled {
+        channel.power = match cp_txpwr.unwrap().value.as_str() {
+            "LOWPWR" => Power::Watts(1.0),
+            "HIGHPWR" => if channel.frequency_tx < Frequency::from_mhz(174.0) {
+                Power::Watts(5.0)
+            } else if channel.frequency_tx < Frequency::from_mhz(512.0) {
+                Power::Watts(4.0)
+            } else {
+                Power::Watts(2.5)
+            }
+            _ => return Err(format!("Cannot parse power (unrecognized CP_TXPWR): {}", cp_txpwr.unwrap().value).into()),
+        };
+    }
+    // CP_TXINHXPLEN: TX inhibit, [ALWAYS,ONCHNNLFREE,MTCHCLRCD] // @TODO review this
+    let cp_txinhxplen = channel_hash.get("CP_TXINHXPLEN");
+    if cp_txinhxplen.is_some() && cp_txinhxplen.unwrap().applicable == XmlApplicable::Enabled {
+        channel.tx_permit = Some(
+            match cp_txinhxplen.unwrap().value.as_str() {
+                "ALWAYS" => TxPermit::Always,
+                "ONCHNNLFREE" => TxPermit::ChannelFree,
+                "MTCHCLRCD" => TxPermit::ColorCodeSame, // @TODO review this
+                _ => return Err(format!("Cannot parse TX inhibit (unrecognized TXINHXPLEN): {}", cp_txinhxplen.unwrap().value).into()),
+            },
+        );
+    }
+    // mode-specific fields
+    if channel.mode == ChannelMode::FM {
+        let mut fm = FmChannel::default();
+        // CP_CHNLBWDTH: bandwidth [STR_25KHZ, STR_20KHZ, STR_12PT5KHZ]
+        let cp_chnlbwdth_str = channel_hash.get("CP_CHNLBWDTH").unwrap().value.as_str();
+        fm.bandwidth = match cp_chnlbwdth_str {
+            "STR_25KHZ" => Frequency::from_khz(25.0),
+            "STR_20KHZ" => Frequency::from_khz(20.0),
+            "STR_12PT5KHZ" => Frequency::from_khz(12.5),
+            _ => return Err(format!("Cannot parse bandwidth (unrecognized CP_CHNLBWDTH): {}", cp_chnlbwdth_str).into()),
+        };
+        // @TODO set squelch
+        // CP_XSQCHTY
+        let cp_xsqchty = channel_hash.get("CP_XSQCHTY");
+        let cp_rxtplfreq = channel_hash.get("CP_RXTPLFREQ");
+        let cp_rxdplcd = channel_hash.get("CP_RXDPLCD");
+        let cp_rxdplinv = channel_hash.get("CP_RXDPLINV");
+        if cp_xsqchty.is_some() && cp_xsqchty.unwrap().applicable == XmlApplicable::Enabled {
+            fm.tone_rx = match cp_xsqchty.unwrap().value.as_str() {
+                "CSQ" => None,
+                "TPL" => Some(Tone::Ctcss(cp_rxtplfreq.unwrap().value.parse::<f64>()?)),
+                "DPL" => Some(Tone::Dcs(cp_rxdplcd.unwrap().value.clone()
+                    + if cp_rxdplinv.unwrap().value == "1" { "I" } else { "N" })),
+                _ => return Err(format!("Cannot parse RX squelch (unrecognized CP_XSQCHTY): {}", cp_xsqchty.unwrap().value).into()),
+            };
+        }
+        // CP_TXSQCHTY
+        let cp_txsqchty = channel_hash.get("CP_TXSQCHTY");
+        let cp_txttplfreq = channel_hash.get("CP_TXTTPLFREQ");
+        let cp_txtdplcd = channel_hash.get("CP_TXTDPLCD");
+        let cp_txdplinv = channel_hash.get("CP_TXDPLINV");
+        if cp_txsqchty.is_some() && cp_txsqchty.unwrap().applicable == XmlApplicable::Enabled {
+            fm.tone_tx = match cp_txsqchty.unwrap().value.as_str() {
+                "CSQ" => None,
+                "TPL" => Some(Tone::Ctcss(cp_txttplfreq.unwrap().value.parse::<f64>()?)),
+                "DPL" => Some(Tone::Dcs(cp_txtdplcd.unwrap().value.clone()
+                    + if cp_txdplinv.unwrap().value == "1" { "I" } else { "N" })),
+                _ => return Err(format!("Cannot parse TX squelch (unrecognized CP_TXSQCHTY): {}", cp_txsqchty.unwrap().value).into()),
+            };
+        }
+        channel.fm = Some(fm);
+    }
+    if channel.mode == ChannelMode::DMR {
+        let mut dmr = DmrChannel::default();
+        // CP_SLTASSGMNT: timeslot [SLOT1, SLOT2]
+        let cp_sltassgmnt_str = channel_hash.get("CP_SLTASSGMNT").unwrap().value.as_str();
+        dmr.timeslot = cp_sltassgmnt_str.replace("SLOT", "").parse::<u8>()?;
+        // CP_COLORCODE: color code
+        let cp_colorcode_str = channel_hash.get("CP_COLORCODE").unwrap().value.as_str();
+        dmr.color_code = cp_colorcode_str.parse::<u8>()?;
+        // @TODO
+        // dmr.talkgroup, dmr.talkgrouplist, dmr.id_name
+        channel.dmr = Some(dmr);
     }
     Ok(channel)
 }
