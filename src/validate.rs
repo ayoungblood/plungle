@@ -48,8 +48,26 @@ pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &B
         }
         let rx_band = bandplan::get_band(bandplan, channel.frequency_rx);
         let tx_band = bandplan::get_band(bandplan, channel.frequency_tx);
-        // warn less strongly if we don't know the RX band
-        if rx_band.is_none() {
+        if tx_band.is_none() && rx_band.is_none() {
+            // warn if we don't know either band
+            complaints.push(Complaint {
+                severity: Severity::Warning,
+                message: format!("Unrecognized TX/RX band: {}/{}",
+                    freq2str(&channel.frequency_tx),
+                    freq2str(&channel.frequency_rx)),
+                source_index: Some(channel.index),
+                source_name: Some(channel.name.clone()),
+            })
+        } else if tx_band.is_none() && !channel.rx_only {
+            // warn if we don't know the TX band, but only if the channel is not RX only
+            complaints.push(Complaint {
+                severity: Severity::Warning,
+                message: format!("Unrecognized TX band: {}", freq2str(&channel.frequency_tx)),
+                source_index: Some(channel.index),
+                source_name: Some(channel.name.clone()),
+            });
+        } else if rx_band.is_none() {
+            // warn less strongly if we don't know the RX band
             complaints.push(Complaint {
                 severity: Severity::Info,
                 message: format!("Unrecognized RX band: {}", freq2str(&channel.frequency_rx)),
@@ -57,15 +75,7 @@ pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &B
                 source_name: Some(channel.name.clone()),
             });
         }
-        // warn if we don't know the TX band, but only if the channel is not RX only
-        if tx_band.is_none() && !channel.rx_only {
-            complaints.push(Complaint {
-                severity: Severity::Warning,
-                message: format!("Unrecognized TX band: {}", freq2str(&channel.frequency_tx)),
-                source_index: Some(channel.index),
-                source_name: Some(channel.name.clone()),
-            });
-        }
+
         // if we have both bands
         if !rx_band.is_none() && !tx_band.is_none() {
             // warn on crossband
