@@ -333,3 +333,45 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 
     Ok(codeplug)
 }
+
+// WRITE //////////////////////////////////////////////////////////////////////
+
+fn write_channel_fm(opt: &Opt, channel: &Channel) -> () {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+
+}
+
+fn write_channel_dmr(opt: &Opt, channel: &Channel) -> () {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+}
+
+fn write_channels(codeplug: &Codeplug, path: &Path, opt: &Opt)  -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
+
+    for channel in &codeplug.channels {
+        uprintln!(opt, Stderr, None, 4, "Writing channel {:width$}: {}", channel.index, channel.name, width=get_props().channel_index_width);
+        match channel.mode {
+            ChannelMode::FM => write_channel_fm(opt, channel),
+            ChannelMode::DMR => write_channel_dmr(opt, channel),
+            _ => return Err("Unsupported mode".into())
+        }
+    }
+    Ok(())
+}
+
+
+pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    // if the output path exists, complain
+    if output_path.exists() {
+        uprintln!(opt, Stderr, Color::Red, None, "Output path already exists: {}", output_path.display());
+        return Err("Output path already exists".into());
+    }
+
+    write_channels(&codeplug, &output_path, &opt)?;
+
+    Ok(())
+}
