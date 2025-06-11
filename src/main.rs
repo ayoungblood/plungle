@@ -22,25 +22,25 @@ mod filter;
 #[derive(Debug, Parser)]
 #[clap(version, author, about = "Codeplug conversion tool")]
 struct Opt {
-    /// Verbose mode (-v, -vv, -vvv)
-    #[arg(short, long, action = clap::ArgAction::Count, global=true)]
-    verbose: u8,
-
     /// Color output
     #[arg(short, long, default_value_t, value_enum, global=true)]
     color: clap::ColorChoice,
 
-    /// Quiet output
-    #[arg(short, long, action = clap::ArgAction::SetTrue, global=true)]
-    quiet: bool,
+    /// Filter
+    #[arg(short, long, global=true)]
+    filter: Option<Vec<String>>,
 
     /// Intermediary format
     #[arg(short = 'F', long, default_value_t, value_enum, global=true)]
     format: helpers::Format,
 
-    /// Filter
-    #[arg(short, long, global=true)]
-    filter: Option<Vec<String>>,
+    /// Quiet output
+    #[arg(short, long, action = clap::ArgAction::SetTrue, global=true)]
+    quiet: bool,
+
+    /// Verbose mode (-v, -vv, -vvv)
+    #[arg(short, long, action = clap::ArgAction::Count, global=true)]
+    verbose: u8,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -164,7 +164,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // filter codeplug
             codeplug = filter::filter_codeplug(&opt, &codeplug, &opt.filter)?;
             // validate codeplug
-            validate::validate_codeplug(&opt, &codeplug, &model)?;
+            validate::validate_codeplug(&opt, &codeplug, Some(&model))?;
             // write intermediary file
             write_codeplug(&opt, &output, &codeplug)?;
         }
@@ -174,13 +174,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             // filter codeplug
             codeplug = filter::filter_codeplug(&opt, &codeplug, &opt.filter)?;
             // validate codeplug
-            validate::validate_codeplug(&opt, &codeplug, &model)?;
+            validate::validate_codeplug(&opt, &codeplug, Some(&model))?;
             // generate codeplug
             radios::generate_codeplug(&opt, &codeplug, &model, &output)?;
         }
         Some(Commands::Merge { inputs }) => {
             // merge codeplugs
-            let codeplug = merge::merge_codeplug(&opt, &inputs)?;
+            let mut codeplug = merge::merge_codeplug(&opt, &inputs)?;
+            // filter codeplug
+            codeplug = filter::filter_codeplug(&opt, &codeplug, &opt.filter)?;
+            // validate codeplug (without a model, for now)
+            validate::validate_codeplug(&opt, &codeplug, None)?;
             // write intermediary file
             write_codeplug(&opt, &None, &codeplug)?; // @TODO FIXME
         }
