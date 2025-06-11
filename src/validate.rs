@@ -198,7 +198,7 @@ pub fn validate_specific(opt: &Opt, codeplug: &structures::Codeplug, props: &str
     Ok(complaints)
 }
 
-pub fn validate_codeplug(opt: &Opt, codeplug: &Codeplug, model: &String) -> Result<(), Box<dyn Error>> {
+pub fn validate_codeplug(opt: &Opt, codeplug: &Codeplug, model: Option<&String>) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     let mut complaints: Vec<Complaint> = Vec::new();
     // load a band plan
@@ -206,9 +206,11 @@ pub fn validate_codeplug(opt: &Opt, codeplug: &Codeplug, model: &String) -> Resu
     // generic validation
     complaints.extend(validate_generic(opt, codeplug, &bandplan).unwrap());
     // radio-specific validation
-    let properties = radios::get_properties(opt, model).unwrap();
-    // specific validation
-    complaints.extend(validate_specific(opt, codeplug, &properties).unwrap());
+    if model.is_some() {
+        let properties = radios::get_properties(opt, model.unwrap()).unwrap();
+        // specific validation
+        complaints.extend(validate_specific(opt, codeplug, &properties).unwrap());
+    }
     // combine the complaints
     if !opt.quiet { // suppress output if --quiet
         print_complaints(opt, &complaints);
