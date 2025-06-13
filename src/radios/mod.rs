@@ -30,7 +30,7 @@ pub fn parse_codeplug(opt: &Opt, model: &String, input: &PathBuf) -> Result<Code
     if let Some(read_function) = read_functions.get(model.as_str()) {
         return read_function(input, opt);
     } else {
-        uprintln!(opt, Stderr, Color::Red, None, "Unsupported radio model for operation: parse");
+        uprintln!(opt, Stderr, Color::Red, None, "Unsupported radio model for operation parse: {}", model);
         uprintln!(opt, Stderr, None, None, "Operation \"parse\" supports the following radio models:");
         for (kk, _) in read_functions.iter() {
             uprintln!(opt, Stderr, None, None, "    {}", kk);
@@ -55,7 +55,7 @@ pub fn generate_codeplug(opt: &Opt, codeplug: &Codeplug, model: &String, output:
     if let Some(write_function) = write_functions.get(model.as_str()) {
         return write_function(codeplug, output, opt);
     } else {
-        uprintln!(opt, Stderr, Color::Red, None, "Unsupported radio model for operation: write");
+        uprintln!(opt, Stderr, Color::Red, None, "Unsupported radio model for operation write: {}", model);
         uprintln!(opt, Stderr, None, None, "Operation \"write\" supports the following radio models:");
         for (kk, _) in write_functions.iter() {
             uprintln!(opt, Stderr, None, None, "    {}", kk);
@@ -80,7 +80,7 @@ pub fn get_properties(opt: &Opt, model: &String) -> Result<structures::RadioProp
     if let Some(properties_function) = properties_functions.get(model.as_str()) {
         return Ok(properties_function().clone());
     } else {
-        uprintln!(opt, Stderr, Color::Red, None, "Unsupported radio model for operation: properties");
+        uprintln!(opt, Stderr, Color::Red, None, "Unsupported radio model for operation properties: {}", model);
         uprintln!(opt, Stderr, None, None, "Operation \"properties\" supports the following radio models:");
         for (kk, _) in properties_functions.iter() {
             uprintln!(opt, Stderr, None, None, "    {}", kk);
