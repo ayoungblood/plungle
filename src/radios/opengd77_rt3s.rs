@@ -419,6 +419,15 @@ pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> 
     Ok(())
 }
 
+fn write_bandwidth(bandwidth: rust_decimal::Decimal) -> String {
+    let khz: f64 = (bandwidth / Decimal::new(1_000, 0)).to_f64().unwrap();
+    if khz.fract() == 0.0 {
+        format!("{}", khz as i64)
+    } else {
+        format!("{}", khz)
+    }
+}
+
 fn write_tone(tone: &Option<Tone>) -> String {
     match tone {
         Some(tone) => {
@@ -527,7 +536,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 // put a tab in front to prevent Excel from mangling it
                 format!("\t{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Rx Frequency
                 format!("\t{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Tx Frequency
-                (channel.fm.as_ref().unwrap().bandwidth / Decimal::new(1_000, 0)).to_string(), // Bandwidth
+                write_bandwidth(channel.fm.as_ref().unwrap().bandwidth), // Bandwidth
                 "".to_string(), // Colour Code
                 "".to_string(), // Timeslot
                 "".to_string(), // Contact
