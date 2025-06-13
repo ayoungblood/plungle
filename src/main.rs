@@ -91,10 +91,10 @@ fn read_codeplug(opt: &Opt, input_path: &PathBuf) -> Result<structures::Codeplug
     // read the codeplug
     let codeplug: structures::Codeplug;
     if format == helpers::Format::Json {
-        uprintln!(opt, Stderr, Color::Green, None, "Reading codeplug as JSON from: {:?}", input_path);
+        if !opt.quiet { uprintln!(opt, Stderr, Color::Green, None, "Reading codeplug as JSON from: {:?}", input_path); }
         codeplug = serde_json::from_str(&std::fs::read_to_string(input_path)?)?;
     } else if format == helpers::Format::Toml {
-        uprintln!(opt, Stderr, Color::Green, None, "Reading codeplug as TOML from: {:?}", input_path);
+        if !opt.quiet { uprintln!(opt, Stderr, Color::Green, None, "Reading codeplug as TOML from: {:?}", input_path); }
         codeplug = toml::from_str(&std::fs::read_to_string(input_path)?)?;
     } else {
         uprintln!(opt, Stderr, Color::Red, None, "Unsupported codeplug format");
