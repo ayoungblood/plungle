@@ -2,14 +2,7 @@
 // plungle - Radio codeplug conversion tool
 // Author: Akira Youngblood 2024
 
-use clap::{Parser, Subcommand};
-use std::path::PathBuf;
-use std::error::Error;
-use helpers::*;
-use std::io::Write;
-use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
-use crate::Dest::{Stdout, Stderr};
-
+mod frequency;
 mod helpers;
 mod radios;
 mod structures;
@@ -18,6 +11,14 @@ mod bandplan;
 mod printer;
 mod merge;
 mod filter;
+
+use clap::{Parser, Subcommand};
+use std::path::PathBuf;
+use std::error::Error;
+use helpers::*;
+use std::io::Write;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+use crate::Dest::{Stdout, Stderr};
 
 #[derive(Debug, Parser)]
 #[clap(version, author, about = "Codeplug conversion tool")]

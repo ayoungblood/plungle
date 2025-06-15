@@ -10,6 +10,7 @@ use std::sync::OnceLock;
 
 use crate::*;
 use crate::structures::*;
+use frequency::Frequency;
 
 static PROPS: OnceLock<structures::RadioProperties> = OnceLock::new();
 pub fn get_props() -> &'static structures::RadioProperties {
@@ -150,8 +151,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
     }
     if channel.mode == ChannelMode::FM { // FM specific fields
         channel.fm = Some(FmChannel {
-            // strip the 'K' from the end of the value
-            bandwidth: Decimal::from_str(record.get("Band Width").unwrap().strip_suffix("K").unwrap())?,
+            bandwidth: Frequency::from_khz_str(record.get("Band Width").unwrap()).unwrap(),
             squelch: Squelch::Default,
             tone_rx: parse_tone(record.get("Dec QT/DQT").unwrap()),
             tone_tx: parse_tone(record.get("Enc QT/DQT").unwrap()),

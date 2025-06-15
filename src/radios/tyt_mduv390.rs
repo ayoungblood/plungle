@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::*;
 use crate::structures::*;
+use frequency::Frequency;
 
 static PROPS: OnceLock<structures::RadioProperties> = OnceLock::new();
 pub fn get_props() -> &'static structures::RadioProperties {
@@ -174,9 +175,9 @@ fn parse_channel_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> R
         ChannelMode::FM => {
             channel.fm = Some(FmChannel {
                 bandwidth: match record.get("Band Width").unwrap().as_str() {
-                    "2" => Decimal::new(25_000, 0), // 25kHz
-                    "1" => Decimal::new(20_000, 0), // 20kHz
-                    "0" => Decimal::new(12_500, 0), // 12.5kHz
+                    "2" => Frequency::from_khz(25.0), // 25kHz
+                    "1" => Frequency::from_khz(20.0), // 20kHz
+                    "0" => Frequency::from_khz(12.5), // 12.5kHz
                     _ => return Err(format!("Unrecognized bandwidth: {}", record.get("Band Width").unwrap()).into()),
                 },
                 squelch: Squelch::Percent(record.get("Squelch").unwrap().parse::<u8>()? * 10),
@@ -436,10 +437,10 @@ fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), 
                 channel.name.clone(), // Channel Name
                 format!("{:.5}", channel.frequency_rx / Decimal::new(1_000_000, 0)), // RX Frequency(MHz)
                 format!("{:.5}", channel.frequency_tx / Decimal::new(1_000_000, 0)), // TX Frequency(MHz)
-                match channel.fm.as_ref().unwrap().bandwidth {
-                    bw if bw == Decimal::new(25_000, 0) => "2".to_string(), // 25kHz
-                    bw if bw == Decimal::new(20_000, 0) => "1".to_string(), // 20kHz
-                    bw if bw == Decimal::new(12_500, 0) => "0".to_string(), // 12.5kHz
+                match channel.fm.as_ref().unwrap().bandwidth.khz() {
+                    bw if bw == 25.0 => "2".to_string(), // 25kHz
+                    bw if bw == 20.0 => "1".to_string(), // 20kHz
+                    bw if bw == 12.0 => "0".to_string(), // 12.5kHz
                     _ => return Err("Unrecognized bandwidth".into()),
                 },
                 "0".to_string(), // Scan List

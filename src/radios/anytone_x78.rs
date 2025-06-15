@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::*;
 use crate::structures::*;
+use frequency::Frequency;
 
 static PROPS: OnceLock<structures::RadioProperties> = OnceLock::new();
 pub fn get_props() -> &'static structures::RadioProperties {
@@ -281,11 +282,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
     };
     if channel.mode == ChannelMode::FM { // FM specific fields
         channel.fm = Some(FmChannel {
-            bandwidth: match record.get("Band Width").unwrap().as_str() {
-                "12.5K" => Decimal::from_str("12.5").unwrap() * Decimal::new(1_000, 0),
-                "25K" => Decimal::from_str("25.0").unwrap() * Decimal::new(1_000, 0),
-                _ => return Err(format!("Unrecognized bandwidth: {}", record.get("Band Width").unwrap()).into()),
-            },
+            bandwidth: Frequency::from_khz_str(record.get("Band Width").unwrap().as_str()).unwrap(),
             squelch: Squelch::Default,
             tone_rx: parse_tone(record.get("CTCSS/DCS Decode").unwrap().as_str()),
             tone_tx: parse_tone(record.get("CTCSS/DCS Encode").unwrap().as_str()),
@@ -808,7 +805,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
                 "A-Analog".to_string(), // Channel Type
                 write_power(&channel.power), // Transmit Power
-                format!("{}K", (channel.fm.as_ref().unwrap().bandwidth / Decimal::new(1_000, 0)).to_f64().unwrap()), // Band Width
+                format!("{}K", channel.fm.as_ref().unwrap().bandwidth.khz()), // Band Width
                 if let Some(tone) = &channel.fm.as_ref().unwrap().tone_rx {
                     match tone {
                         Tone::Ctcss(freq) => format!("{:.1}", freq),

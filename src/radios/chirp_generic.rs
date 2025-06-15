@@ -12,6 +12,7 @@ use std::cmp::{max, min};
 
 use crate::*;
 use crate::structures::*;
+use frequency::Frequency;
 
 static PROPS: OnceLock<structures::RadioProperties> = OnceLock::new();
 pub fn get_props() -> &'static structures::RadioProperties {
@@ -186,8 +187,8 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
         };
         channel.fm = Some(FmChannel {
             bandwidth: match record.get("Mode").unwrap().as_str() {
-                "FM" => Decimal::new(25_000, 0),
-                "NFM" => Decimal::new(12_500, 0),
+                "FM" => Frequency::from_khz(25.0),
+                "NFM" => Frequency::from_khz(12.5),
                 _ => return Err(format!("Unsupported mode: {}", record.get("mode").unwrap()).into()),
             },
             squelch: Squelch::Default, // chirp doesn't support squelch
@@ -531,10 +532,11 @@ fn write_tones(channel: &Channel) -> (String, String, String, String, String, St
 
 fn write_mode(channel: &Channel) -> Result<String, Box<dyn Error>> {
     let bandwidth = channel.fm.as_ref().unwrap().bandwidth;
-    match bandwidth.to_u32().unwrap() {
-        25_000 => Ok("FM".to_string()),
-        12_500 => Ok("NFM".to_string()),
-        _ => Err("Unsupported bandwidth".into()),
+    match bandwidth.khz() {
+        25.0 => Ok("FM".to_string()),
+        12.5 => Ok("NFM".to_string()),
+        _ => Err(format!("Unsupported bandwidth: {} ({}:{})",
+            bandwidth.khz(), file!(), line!()).into()),
     }
 }
 

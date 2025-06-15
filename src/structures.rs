@@ -1,6 +1,7 @@
 // src/structures.rs
 
 use serde::{Deserialize, Serialize};
+use crate::frequency::Frequency;
 
 /// Channel mode
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
@@ -29,7 +30,7 @@ pub enum Tone {
 /// Channel FM properties
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct FmChannel {
-    pub bandwidth: rust_decimal::Decimal,
+    pub bandwidth: Frequency,
     pub squelch: Squelch,
     pub tone_rx: Option<Tone>,
     pub tone_tx: Option<Tone>,
