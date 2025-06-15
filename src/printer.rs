@@ -1,7 +1,6 @@
 // src/printer.rs
 
 use std::error::Error;
-use rust_decimal::prelude::ToPrimitive;
 use crate::*;
 use crate::structures::*;
 
@@ -92,7 +91,7 @@ fn pretty_channel(_opt: &Opt, channel: &Channel) -> String {
             if channel.fm.is_some() {
                 line.push_str(&format!(
                     "{} {} {} {}",
-                    format!("bw={:4.1}k", &channel.fm.clone().unwrap().bandwidth.to_f64().unwrap() / 1000.0),
+                    format!("bw={:4.1}k", &channel.fm.clone().unwrap().bandwidth.khz()),
                     format!("sq={:>4}", pretty_squelch(&channel.fm.clone().unwrap().squelch)),
                     format!("tx={:5}", pretty_tone(&channel.fm.clone().unwrap().tone_tx)),
                     format!("rx={:5}", pretty_tone(&channel.fm.clone().unwrap().tone_rx)),

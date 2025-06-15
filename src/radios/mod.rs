@@ -1,18 +1,18 @@
 // src/radios/mod.rs
 
+mod ailunce_hd1;
+mod alinco_djmd5t;
+mod anytone_x78;
+mod chirp_generic;
+mod opengd77_rt3s;
+mod tyt_mduv390;
+
 use std::error::Error;
 use std::collections::HashMap;
 
 use crate::Opt;
 use crate::structures::Codeplug;
 use crate::*;
-
-mod anytone_x78;
-mod opengd77_rt3s;
-mod chirp_generic;
-mod ailunce_hd1;
-mod alinco_djmd5t;
-mod tyt_mduv390;
 
 pub fn parse_codeplug(opt: &Opt, model: &String, input: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());

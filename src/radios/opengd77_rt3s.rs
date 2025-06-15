@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::*;
 use crate::structures::*;
+use frequency::Frequency;
 
 static PROPS: OnceLock<structures::RadioProperties> = OnceLock::new();
 pub fn get_props() -> &'static structures::RadioProperties {
@@ -217,7 +218,7 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
 
     if channel.mode == ChannelMode::FM { // FM specific fields
         channel.fm = Some(FmChannel {
-            bandwidth: Decimal::from_str(record.get("Bandwidth (kHz)").unwrap())? * Decimal::new(1_000, 0),
+            bandwidth: Frequency::from_khz_str(record.get("Bandwidth (kHz)").unwrap()).unwrap(),
             squelch: parse_squelch(record.get("Squelch").unwrap().as_str()),
             tone_rx: parse_tone(record.get("RX Tone").unwrap().as_str()),
             tone_tx: parse_tone(record.get("TX Tone").unwrap().as_str()),
@@ -419,15 +420,6 @@ pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> 
     Ok(())
 }
 
-fn write_bandwidth(bandwidth: rust_decimal::Decimal) -> String {
-    let khz: f64 = (bandwidth / Decimal::new(1_000, 0)).to_f64().unwrap();
-    if khz.fract() == 0.0 {
-        format!("{}", khz as i64)
-    } else {
-        format!("{}", khz)
-    }
-}
-
 fn write_tone(tone: &Option<Tone>) -> String {
     match tone {
         Some(tone) => {
@@ -536,7 +528,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 // put a tab in front to prevent Excel from mangling it
                 format!("\t{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Rx Frequency
                 format!("\t{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Tx Frequency
-                write_bandwidth(channel.fm.as_ref().unwrap().bandwidth), // Bandwidth
+                format!("{}", channel.fm.as_ref().unwrap().bandwidth.khz()), // Bandwidth
                 "".to_string(), // Colour Code
                 "".to_string(), // Timeslot
                 "".to_string(), // Contact
