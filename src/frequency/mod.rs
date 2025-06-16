@@ -4,8 +4,11 @@
 use std::fmt;
 use std::num::ParseFloatError;
 use std::ops::{Add, Sub, Mul, Div};
+use serde::{Serialize,Deserialize,Serializer,Deserializer};
+use serde::de::{self, MapAccess, Visitor};
+use serde::ser::SerializeStruct;
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, PartialOrd, Eq, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub struct Frequency {
     pub freq_uhz: i64,
 }
@@ -145,6 +148,105 @@ impl fmt::Display for Frequency {
                 // Otherwise, use the default formatting for Display
                 write!(f, "{} Hz", self.hz())
             }
+    }
+}
+
+// Custom serialization and deserialization using fixed point
+impl Serialize for Frequency {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let whole_hz = self.freq_uhz / 1_000_000;
+        let fractional_hz = self.freq_uhz % 1_000_000;
+        let display_fractional_hz = fractional_hz.abs();
+        let formatted_hz = format!("{}.{:06}", whole_hz, display_fractional_hz);
+        let mut state = serializer.serialize_struct("Frequency", 1)?;
+        state.serialize_field("freq_hz", &formatted_hz)?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Frequency {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct FrequencyVisitor;
+
+        impl<'de> Visitor<'de> for FrequencyVisitor {
+            type Value = Frequency;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a struct with a single field named `freq_hz`")
+            }
+            fn visit_map<V>(self, mut map: V) -> Result<Frequency, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut freq_hz_str: Option<String> = None;
+
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "freq_hz" => {
+                            if freq_hz_str.is_some() {
+                                return Err(de::Error::duplicate_field("freq_hz"));
+                            }
+                            freq_hz_str = Some(map.next_value()?);
+                        }
+                        _ => {
+                            let _ = map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                let s = freq_hz_str.ok_or_else(|| de::Error::missing_field("freq_hz"))?;
+
+                let parts: Vec<&str> = s.split('.').collect();
+                if parts.len() > 2 {
+                    return Err(de::Error::custom("Invalid fixed-point number format: too many decimal points"));
+                }
+
+                let mut whole_part_str = parts[0];
+                let mut fractional_part_str = "";
+
+                if parts.len() == 2 {
+                    fractional_part_str = parts[1];
+                }
+
+                let is_negative = whole_part_str.starts_with('-');
+                if whole_part_str.starts_with('+') {
+                    whole_part_str = &whole_part_str[1..];
+                }
+
+                let mut whole_uhz = whole_part_str.parse::<i64>()
+                    .map_err(|e| de::Error::custom(format!("Invalid whole part: {}", e)))?;
+                whole_uhz *= 1_000_000;
+
+                let mut fractional_uhz = 0_i64;
+                if !fractional_part_str.is_empty() {
+                    let mut digits_str = fractional_part_str;
+                    if digits_str.len() > 6 {
+                        digits_str = &fractional_part_str[..6];
+                    }
+
+                    fractional_uhz = digits_str.parse::<i64>()
+                        .map_err(|e| de::Error::custom(format!("Invalid fractional part: {}", e)))?;
+
+                    let scale_factor = 10_i64.pow((6 - digits_str.len()) as u32);
+                    fractional_uhz *= scale_factor;
+                }
+
+                let total_uhz = if is_negative && (whole_uhz != 0 || fractional_uhz != 0) {
+                    whole_uhz - fractional_uhz
+                } else {
+                    whole_uhz + fractional_uhz
+                };
+
+                Ok(Frequency { freq_uhz: total_uhz })
+            }
+        }
+
+        deserializer.deserialize_struct("Frequency", &["freq_hz"], FrequencyVisitor)
     }
 }
 
@@ -313,5 +415,22 @@ mod tests {
         assert_eq!(f6.unwrap().mhz(), 123.4);
         let f7 = Frequency::from_ghz_str("1.234");
         assert_eq!(f7.unwrap().ghz(), 1.234);
+    }
+
+    #[test]
+    fn test_serialize_deserialize() {
+        let f1 = Frequency::from_hz(0.0);
+        let json = serde_json::to_string(&f1).unwrap();
+        let deserialized = serde_json::from_str(&json).unwrap();
+        assert_eq!(f1, deserialized);
+        let f2 = Frequency::from_hz(123.456789);
+        let json = serde_json::to_string(&f2).unwrap();
+        let deserialized = serde_json::from_str(&json).unwrap();
+        assert_eq!(f2, deserialized);
+        let f3 = Frequency::from_khz(987.654321001);
+        let json = serde_json::to_string(&f3).unwrap();
+        let deserialized = serde_json::from_str(&json).unwrap();
+        assert_eq!(f3, deserialized);
+
     }
 }
