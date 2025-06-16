@@ -1,6 +1,7 @@
 // src/structures.rs
 
 use serde::{Deserialize, Serialize};
+
 use crate::frequency::Frequency;
 
 /// Channel mode

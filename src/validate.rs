@@ -53,8 +53,8 @@ pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &B
             complaints.push(Complaint {
                 severity: Severity::Warning,
                 message: format!("Unrecognized TX/RX band: {}/{}",
-                    freq2str(&channel.frequency_tx),
-                    freq2str(&channel.frequency_rx)),
+                    channel.frequency_tx.to_pretty_str(),
+                    channel.frequency_rx.to_pretty_str()),
                 source_index: Some(channel.index),
                 source_name: Some(channel.name.clone()),
             })
@@ -62,7 +62,7 @@ pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &B
             // warn if we don't know the TX band, but only if the channel is not RX only
             complaints.push(Complaint {
                 severity: Severity::Warning,
-                message: format!("Unrecognized TX band: {}", freq2str(&channel.frequency_tx)),
+                message: format!("Unrecognized TX band: {}", channel.frequency_tx.to_pretty_str()),
                 source_index: Some(channel.index),
                 source_name: Some(channel.name.clone()),
             });
@@ -70,7 +70,7 @@ pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &B
             // warn less strongly if we don't know the RX band
             complaints.push(Complaint {
                 severity: Severity::Info,
-                message: format!("Unrecognized RX band: {}", freq2str(&channel.frequency_rx)),
+                message: format!("Unrecognized RX band: {}", channel.frequency_rx.to_pretty_str()),
                 source_index: Some(channel.index),
                 source_name: Some(channel.name.clone()),
             });
@@ -82,7 +82,9 @@ pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &B
             if rx_band != tx_band {
                 complaints.push(Complaint {
                     severity: Severity::Warning,
-                    message: format!("Crossband: {} rx: {}", freq2str(&channel.frequency_tx), freq2str(&channel.frequency_rx)),
+                    message: format!("Crossband: {} rx: {}",
+                        channel.frequency_tx.to_pretty_str(),
+                        channel.frequency_rx.to_pretty_str()),
                     source_index: Some(channel.index),
                     source_name: Some(channel.name.clone()),
                 });
@@ -102,7 +104,10 @@ pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &B
                     if !matched {
                         complaints.push(Complaint {
                             severity: Severity::Warning,
-                            message: format!("Unusual offset: {} (tx: {} rx: {})", freq2str(&diff), freq2str(&channel.frequency_tx), freq2str(&channel.frequency_rx)),
+                            message: format!("Unusual offset: {} (tx: {} rx: {})",
+                                diff.to_pretty_str(),
+                                channel.frequency_tx.to_pretty_str(),
+                                channel.frequency_rx.to_pretty_str()),
                             source_index: Some(channel.index),
                             source_name: Some(channel.name.clone()),
                         });
@@ -118,7 +123,7 @@ pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &B
                         // warn less strongly about MURS
                         complaints.push(Complaint {
                             severity: Severity::Info,
-                            message: format!("TX on MURS: {}", freq2str(&channel.frequency_tx)),
+                            message: format!("TX on MURS: {}", channel.frequency_tx.to_pretty_str()),
                             source_index: Some(channel.index),
                             source_name: Some(channel.name.clone()),
                         });
@@ -126,14 +131,14 @@ pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &B
                         // warn less strongly about FRS/GMRS
                         complaints.push(Complaint {
                             severity: Severity::Info,
-                            message: format!("TX on FRS/GMRS: {}", freq2str(&channel.frequency_tx)),
+                            message: format!("TX on FRS/GMRS: {}", channel.frequency_tx.to_pretty_str()),
                             source_index: Some(channel.index),
                             source_name: Some(channel.name.clone()),
                         });
                     } else {
                         complaints.push(Complaint {
                             severity: Severity::Error,
-                            message: format!("TX outside amateur band: {}", freq2str(&channel.frequency_tx)),
+                            message: format!("TX outside amateur band: {}", channel.frequency_tx.to_pretty_str()),
                             source_index: Some(channel.index),
                             source_name: Some(channel.name.clone()),
                         });

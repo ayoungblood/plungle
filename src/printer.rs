@@ -1,6 +1,7 @@
 // src/printer.rs
 
 use std::error::Error;
+
 use crate::*;
 use crate::structures::*;
 
@@ -77,8 +78,8 @@ fn pretty_channel(_opt: &Opt, channel: &Channel) -> String {
     line.push_str(&format!("{:4} ", channel.index));
     line.push_str(&format!("{:16} ", channel.name));
     line.push_str(&format!("{:4} ", format!("{:?}", channel.mode)));
-    line.push_str(&format!("{:12} ", freq2str(&channel.frequency_rx)));
-    line.push_str(&format!("{:12} ", freq2str(&channel.frequency_tx)));
+    line.push_str(&format!("{:12} ", channel.frequency_rx.to_pretty_str_fixed()));
+    line.push_str(&format!("{:12} ", channel.frequency_tx.to_pretty_str_fixed()));
     line.push_str(&format!("{:3} ", if channel.rx_only { "RXO" } else { "   " }));
     line.push_str(&format!("{:4} ", pretty_timeout(&channel.tx_tot)));
     line.push_str(&format!("{:5} ", pretty_power(&channel.power)));

@@ -1,6 +1,5 @@
 // src/helpers.rs
 
-use crate::frequency::Frequency;
 use clap::ValueEnum;
 
 #[derive(Debug, Clone, ValueEnum, PartialEq, Default)]
@@ -179,19 +178,4 @@ macro_rules! function {
         let name = type_name_of(f);
         name.strip_suffix("::f").unwrap()
     }}
-}
-
-// print a Decimal as a frequency
-pub fn freq2str(freq: &Frequency) -> String {
-    let f: f64 = freq.hz();
-    if f >= 1e9 {
-        return format!("{:8.4} GHz", f/1e9)
-    } else if f >= 1e6 {
-        return format!("{:8.4} MHz", f/1e6)
-    } else if f >= 1e3 {
-        return format!("{:8.4} kHz", f/1e3)
-    } else if f >= 1.0 {
-        return format!("{:8.4} Hz", f)
-    }
-    format!("{:.6}", f)
 }

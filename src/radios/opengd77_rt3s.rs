@@ -217,7 +217,7 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
 
     if channel.mode == ChannelMode::FM { // FM specific fields
         channel.fm = Some(FmChannel {
-            bandwidth: Frequency::from_khz_str(record.get("Bandwidth (kHz)").unwrap()).unwrap(),
+            bandwidth: Frequency::from_khz_str(record.get("Bandwidth (kHz)").unwrap())?,
             squelch: parse_squelch(record.get("Squelch").unwrap().as_str()),
             tone_rx: parse_tone(record.get("RX Tone").unwrap().as_str()),
             tone_tx: parse_tone(record.get("TX Tone").unwrap().as_str()),
