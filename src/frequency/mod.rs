@@ -17,37 +17,37 @@ impl Frequency {
     }
 
     pub fn from_hz(freq_hz: f64) -> Self {
-        Frequency { freq_uhz: (freq_hz * 1_000_000.0) as i64 }
+        Frequency { freq_uhz: (freq_hz * 1e6) as i64 }
     }
     pub fn from_khz(freq_khz: f64) -> Self {
-        Frequency { freq_uhz: (freq_khz * 1_000_000_000.0) as i64 }
+        Frequency { freq_uhz: (freq_khz * 1e9) as i64 }
     }
     pub fn from_mhz(freq_mhz: f64) -> Self {
-        Frequency { freq_uhz: (freq_mhz * 1_000_000_000_000.0) as i64 }
+        Frequency { freq_uhz: (freq_mhz * 1e12) as i64 }
     }
     pub fn from_ghz(freq_ghz: f64) -> Self {
-        Frequency { freq_uhz: (freq_ghz * 1_000_000_000_000_000.0) as i64 }
+        Frequency { freq_uhz: (freq_ghz * 1e15) as i64 }
     }
 
     pub fn hz(&self) -> f64 {
-        self.freq_uhz as f64 / 1_000_000.0
+        self.freq_uhz as f64 / 1e6
     }
     pub fn khz(&self) -> f64 {
-        self.freq_uhz as f64 / 1_000_000_000.0
+        self.freq_uhz as f64 / 1e9
     }
     pub fn mhz(&self) -> f64 {
-        self.freq_uhz as f64 / 1_000_000_000_000.0
+        self.freq_uhz as f64 / 1e12
     }
     pub fn ghz(&self) -> f64 {
-        self.freq_uhz as f64 / 1_000_000_000_000_000.0
+        self.freq_uhz as f64 / 1e15
     }
 
     pub fn to_pretty_str(&self) -> String {
-        if self.hz() < 1000.0 {
+        if self.hz() < 1e3 {
             format!("{:.} Hz", self.hz())
-        } else if self.hz() < 1_000_000.0 {
+        } else if self.hz() < 1e6 {
             format!("{:.} kHz", self.khz())
-        } else if self.hz() < 1_000_000_000.0 {
+        } else if self.hz() < 1e9 {
             format!("{:.} MHz", self.mhz())
         } else {
             format!("{:.} GHz", self.ghz())
@@ -55,11 +55,11 @@ impl Frequency {
     }
 
     pub fn to_pretty_str_fixed(&self) -> String {
-        if self.hz() < 1000.0 {
+        if self.hz() < 1e3 {
             format!("{:8.4} Hz", self.hz())
-        } else if self.hz() < 1_000_000.0 {
+        } else if self.hz() < 1e6 {
             format!("{:8.4} kHz", self.khz())
-        } else if self.hz() < 1_000_000_000.0 {
+        } else if self.hz() < 1e9 {
             format!("{:8.4} MHz", self.mhz())
         } else {
             format!("{:8.4} GHz", self.ghz())
@@ -71,28 +71,28 @@ impl Frequency {
             .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
             .collect::<String>()
             .parse()
-            .map(|freq_hz: f64| Frequency { freq_uhz: (freq_hz * 1_000_000.0) as i64 })
+            .map(|freq_hz: f64| Frequency { freq_uhz: (freq_hz * 1e6) as i64 })
     }
     pub fn from_khz_str(str: &str) -> Result<Self, ParseFloatError> {
         str.chars()
             .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
             .collect::<String>()
             .parse()
-            .map(|freq_khz: f64| Frequency { freq_uhz: (freq_khz * 1_000_000_000.0) as i64 })
+            .map(|freq_khz: f64| Frequency { freq_uhz: (freq_khz * 1e9) as i64 })
     }
     pub fn from_mhz_str(str: &str) -> Result<Self, ParseFloatError> {
         str.chars()
             .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
             .collect::<String>()
             .parse()
-            .map(|freq_mhz: f64| Frequency { freq_uhz: (freq_mhz * 1_000_000_000_000.0) as i64 })
+            .map(|freq_mhz: f64| Frequency { freq_uhz: (freq_mhz * 1e12) as i64 })
     }
     pub fn from_ghz_str(str: &str) -> Result<Self, ParseFloatError> {
         str.chars()
             .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
             .collect::<String>()
             .parse()
-            .map(|freq_ghz: f64| Frequency { freq_uhz: (freq_ghz * 1_000_000_000_000_000.0) as i64 })
+            .map(|freq_ghz: f64| Frequency { freq_uhz: (freq_ghz * 1e15) as i64 })
     }
 
     pub fn abs(&self) -> Self {
