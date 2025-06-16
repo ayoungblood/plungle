@@ -1,3 +1,6 @@
+// Fixed-point frequency representation
+// Author: Akira Youngblood 2025
+
 use std::fmt;
 use std::num::ParseFloatError;
 use std::ops::{Add, Sub, Mul, Div};
@@ -48,6 +51,18 @@ impl Frequency {
             format!("{:.} MHz", self.mhz())
         } else {
             format!("{:.} GHz", self.ghz())
+        }
+    }
+
+    pub fn to_pretty_str_fixed(&self) -> String {
+        if self.hz() < 1000.0 {
+            format!("{:8.4} Hz", self.hz())
+        } else if self.hz() < 1_000_000.0 {
+            format!("{:8.4} kHz", self.khz())
+        } else if self.hz() < 1_000_000_000.0 {
+            format!("{:8.4} MHz", self.mhz())
+        } else {
+            format!("{:8.4} GHz", self.ghz())
         }
     }
 
@@ -124,7 +139,7 @@ impl Div<f64> for Frequency {
 impl fmt::Display for Frequency {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(precision) = f.precision() {
-            // If a precision was specified, format the f64 with that precision
+                // If a precision was specified, format the f64 with that precision
                 write!(f, "{:.width$} Hz", self.hz(), width = precision)
             } else {
                 // Otherwise, use the default formatting for Display
