@@ -1,10 +1,7 @@
 # tool output
 output/
 output.json
-bandplan.toml
-
-# test artifacts
-tests/temp
+/bandplan.toml
 
 # Added by cargo
 target/

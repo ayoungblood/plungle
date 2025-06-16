@@ -7,7 +7,7 @@ cargo build
 target='../target/debug/plungle'
 
 # create temp directory if it doesn't exist
-tempdir='temp'
+tempdir='temp.compare'
 mkdir -p $tempdir
 
 printf "\n\x1b[4;36m[compare.sh] Testing Ailunce HD1 >>>>>>>>>>>>>>>>>>>>>>>>>>>>\x1b[0m\n"
