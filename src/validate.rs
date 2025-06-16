@@ -208,6 +208,7 @@ pub fn validate_codeplug(opt: &Opt, codeplug: &Codeplug, model: Option<&String>)
     let mut complaints: Vec<Complaint> = Vec::new();
     // load a band plan
     let bandplan = bandplan::load_bandplan(opt)?;
+    uprintln!(opt, Stderr, None, 1, "Using bandplan: {}", bandplan.name);
     // generic validation
     complaints.extend(validate_generic(opt, codeplug, &bandplan).unwrap());
     // radio-specific validation

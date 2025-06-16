@@ -1,0 +1,198 @@
+{
+  "name": "Default Bandplan",
+  "source": null,
+  "bands": [
+    {
+      "name": "Amateur 10m",
+      "ranges": [
+        [
+          {
+            "freq_hz": "28000000.000000"
+          },
+          {
+            "freq_hz": "29700000.000000"
+          }
+        ]
+      ],
+      "nominal_offsets": [
+        {
+          "freq_hz": "100000.000000"
+        }
+      ],
+      "is_amateur": true
+    },
+    {
+      "name": "Amateur 6m",
+      "ranges": [
+        [
+          {
+            "freq_hz": "50000000.000000"
+          },
+          {
+            "freq_hz": "54000000.000000"
+          }
+        ]
+      ],
+      "nominal_offsets": [
+        {
+          "freq_hz": "500000.000000"
+        },
+        {
+          "freq_hz": "1000000.000000"
+        }
+      ],
+      "is_amateur": true
+    },
+    {
+      "name": "Amateur 2m",
+      "ranges": [
+        [
+          {
+            "freq_hz": "144000000.000000"
+          },
+          {
+            "freq_hz": "148000000.000000"
+          }
+        ]
+      ],
+      "nominal_offsets": [
+        {
+          "freq_hz": "600000.000000"
+        }
+      ],
+      "is_amateur": true
+    },
+    {
+      "name": "MURS",
+      "ranges": [
+        [
+          {
+            "freq_hz": "151820000.000000"
+          },
+          {
+            "freq_hz": "151940000.000000"
+          }
+        ],
+        [
+          {
+            "freq_hz": "154570000.000000"
+          },
+          {
+            "freq_hz": "154600000.000000"
+          }
+        ]
+      ],
+      "nominal_offsets": null,
+      "is_amateur": false
+    },
+    {
+      "name": "Amateur 1.25m",
+      "ranges": [
+        [
+          {
+            "freq_hz": "219000000.000000"
+          },
+          {
+            "freq_hz": "225000000.000000"
+          }
+        ]
+      ],
+      "nominal_offsets": [
+        {
+          "freq_hz": "1600000.000000"
+        }
+      ],
+      "is_amateur": true
+    },
+    {
+      "name": "Amateur 70cm",
+      "ranges": [
+        [
+          {
+            "freq_hz": "420000000.000000"
+          },
+          {
+            "freq_hz": "450000000.000000"
+          }
+        ]
+      ],
+      "nominal_offsets": [
+        {
+          "freq_hz": "5000000.000000"
+        }
+      ],
+      "is_amateur": true
+    },
+    {
+      "name": "FRS/GMRS",
+      "ranges": [
+        [
+          {
+            "freq_hz": "462550000.000000"
+          },
+          {
+            "freq_hz": "462725000.000000"
+          }
+        ],
+        [
+          {
+            "freq_hz": "467550000.000000"
+          },
+          {
+            "freq_hz": "467725000.000000"
+          }
+        ]
+      ],
+      "nominal_offsets": [
+        {
+          "freq_hz": "5000000.000000"
+        }
+      ],
+      "is_amateur": false
+    },
+    {
+      "name": "Amateur 33cm",
+      "ranges": [
+        [
+          {
+            "freq_hz": "902000000.000000"
+          },
+          {
+            "freq_hz": "928000000.000000"
+          }
+        ]
+      ],
+      "nominal_offsets": [
+        {
+          "freq_hz": "12000000.000000"
+        },
+        {
+          "freq_hz": "25000000.000000"
+        }
+      ],
+      "is_amateur": true
+    },
+    {
+      "name": "Amateur 23cm",
+      "ranges": [
+        [
+          {
+            "freq_hz": "1240000000.000000"
+          },
+          {
+            "freq_hz": "1300000000.000000"
+          }
+        ]
+      ],
+      "nominal_offsets": [
+        {
+          "freq_hz": "12000000.000000"
+        },
+        {
+          "freq_hz": "20000000.000000"
+        }
+      ],
+      "is_amateur": true
+    }
+  ]
+}
