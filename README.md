@@ -12,15 +12,21 @@ Please also see [qdmr](https://dm3mat.darc.de/qdmr/), a tool by DM3MAT that reve
 > [!WARNING]
 > plungle is still in its infancy. Expect breaking changes, incomplete output, and errors in reading/writing radio-specific files. Please report any issues.
 
-## Installation
+## 1. Installation
 
 Currently, there are no compiled binaries available.
 
-### Building from source
+### 1.1 Building from source
 
-First, you need to [install Rust](https://www.rust-lang.org/tools/install). On *nix/MacOS, this is very straightforward. On Windows, it is highly recommended to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install).
+#### 1.1.1 Install Rust
 
-Then, clone the repository and build the project:
+[Follow instructions for your platform](https://www.rust-lang.org/tools/install).
+
+On *nix/MacOS, this is very straightforward. On Windows, it is highly recommended to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install).
+
+#### 1.1.2 Clone and build plungle
+
+Clone the repository and build the project:
 
 ```
 git clone https://github.com/ayoungblood/plungle.git
@@ -44,7 +50,7 @@ Verify the installation:
 plungle --version
 ```
 
-## Usage
+## 2. Usage
 
 Parse a codeplug export from Radio A into an intermediary format
 ```
@@ -62,7 +68,7 @@ plungle merge codeplug-1.json codeplug-2.json codeplug-3.json --format=json > ou
 ```
 The merge argument syntax isn't great. It will be improved.
 
-### Example
+### 2.1 Example
 
 For this example, we are going to convert a codeplug for the Retevis RT3S running OpenGD77 to a codeplug for the Anytone AT-D878UV.
 
@@ -80,13 +86,13 @@ Generate the codeplug export files for the target radio (where `output` is a dir
 plungle generate anytone_x78 codeplug.json output
 ```
 
-## Documentation
+## 3. Documentation
 
 Complete documentation is not yet written.
 
-## Status/Issues
+## 4. Status/Issues
 
-### Supported Radios
+### 4.1 Supported Radios
 
 * Anytone D878UV (other Dx78 radios are untested but may work)
 * Retevis RT3S running OpenGD77 (any other OpenGD77 radio should be supported, but has not been tested)
@@ -95,7 +101,7 @@ Complete documentation is not yet written.
 * TYT MD-UV390 (support is very poor due to limitations of the MD-UV390 CPS)
 * Generic [CHIRP](https://chirpmyradio.com/projects/chirp/wiki/Home) support
 
-## Future Plans
+## 5. Future Plans
 
 Future features that may eventually be added include:
 
@@ -107,13 +113,18 @@ Future features that may eventually be added include:
 * Support for Motorola XPR 6550 (VHF/UHF)
 * Support for Retevis RT3S on stock firmware, and TYT MD-UV380/MD-UV390 on OpenGD77 firmware
 * Support for Yaesu FT-3D
-* Support for Radioddity DB25-D
+* Support for the excellent [CPEditor by David MM7DBT](https://www.cpeditor.co.uk/), which supports:
+    - Kydera CDR-300UV
+    - Retevis RT73
+    - Radioddity DB25-D
+    - Radioddity DB40-D
+    - Radioddity GD-88
 * Improved support for scanlists
 
-## Contributing
+## 6. Contributing
 
 First, thank you for your interest in this project.
 
 If you wish to contribute to this project, please first discuss the change you wish to make via Github issue, email, or other method with the owner of this project.
 
-This project was developed primarily for personal use, and also as a way to learn Rust. The author is not a software engineer, just a hardware person stumbling along through a new language. As the sole maintainer of this project, I cannot accept contributions that I cannot understand. Please keep that in mind, lest you decide to refactor the whole project because it's "bad".
+This project was developed primarily for personal use, and also as a way to learn Rust. The author is not a software engineer, just a hardware person stumbling along through a new language. As the sole maintainer of this project, I cannot accept contributions that I cannot understand. Please keep that in mind, lest you submit a PR refactoring the entire project because the code is ugly!
