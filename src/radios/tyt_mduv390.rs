@@ -5,7 +5,6 @@ use std::fs;
 use std::path::PathBuf;
 use std::path::Path;
 use std::collections::HashMap;
-use rust_decimal::prelude::*;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -149,8 +148,8 @@ fn parse_channel_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> R
         "2" => ChannelMode::DMR,
         _ => return Err(format!("Unrecognized channel mode: {}", record.get("Channel Mode").unwrap()).into()),
     };
-    channel.frequency_rx = Decimal::from_str(record.get("RX Frequency(MHz)").unwrap().trim())? * Decimal::new(1_000_000, 0);
-    channel.frequency_tx = Decimal::from_str(record.get("TX Frequency(MHz)").unwrap().trim())? * Decimal::new(1_000_000, 0);
+    channel.frequency_rx = Frequency::from_mhz_str(record.get("RX Frequency(MHz)").unwrap())?;
+    channel.frequency_tx = Frequency::from_mhz_str(record.get("TX Frequency(MHz)").unwrap())?;
     channel.rx_only = record.get("Rx Only").unwrap().as_str() == "1";
     if record.get("TOT[s]").unwrap() == "0" {
         channel.tx_tot = Timeout::Infinite;
@@ -435,8 +434,8 @@ fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), 
             writer.write_record(&[
                 "1".to_string(), // Channel Mode
                 channel.name.clone(), // Channel Name
-                format!("{:.5}", channel.frequency_rx / Decimal::new(1_000_000, 0)), // RX Frequency(MHz)
-                format!("{:.5}", channel.frequency_tx / Decimal::new(1_000_000, 0)), // TX Frequency(MHz)
+                format!("{:.5}", channel.frequency_rx.mhz()), // RX Frequency(MHz)
+                format!("{:.5}", channel.frequency_tx.mhz()), // TX Frequency(MHz)
                 match channel.fm.as_ref().unwrap().bandwidth.khz() {
                     bw if bw == 25.0 => "2".to_string(), // 25kHz
                     bw if bw == 20.0 => "1".to_string(), // 20kHz
@@ -494,8 +493,8 @@ fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), 
             writer.write_record(&[
                 "2".to_string(), // Channel Mode
                 channel.name.clone(), // Channel Name
-                format!("{:.5}", channel.frequency_rx / Decimal::new(1_000_000, 0)), // RX Frequency(MHz)
-                format!("{:.5}", channel.frequency_tx / Decimal::new(1_000_000, 0)), // TX Frequency(MHz)
+                format!("{:.5}", channel.frequency_rx.mhz()), // RX Frequency(MHz)
+                format!("{:.5}", channel.frequency_tx.mhz()), // TX Frequency(MHz)
                 "0".to_string(), // Band Width
                 "0".to_string(), // Scan List
                 "1".to_string(), // Squelch

@@ -6,7 +6,6 @@ use std::fs;
 use std::path::PathBuf;
 use std::path::Path;
 use std::collections::HashMap;
-use rust_decimal::prelude::*;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -200,8 +199,8 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
         "Digital" => ChannelMode::DMR,
         _ => return Err(format!("Unrecognized channel type: {}", record.get("Channel Type").unwrap()).into()),
     };
-    channel.frequency_rx = Decimal::from_str(record.get("Rx Frequency").unwrap().trim())? * Decimal::new(1_000_000, 0);
-    channel.frequency_tx = Decimal::from_str(record.get("Tx Frequency").unwrap().trim())? * Decimal::new(1_000_000, 0);
+    channel.frequency_rx = Frequency::from_mhz_str(record.get("Rx Frequency").unwrap().trim())?;
+    channel.frequency_tx = Frequency::from_mhz_str(record.get("Tx Frequency").unwrap().trim())?;
     channel.rx_only = record.get("Rx Only").unwrap() == "Yes";
     if record.get("TOT").unwrap() == "0" {
         channel.tx_tot = Timeout::Infinite;
@@ -526,8 +525,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 channel.name.clone(), // Channel Name
                 "Analogue".to_string(), // Channel Type
                 // put a tab in front to prevent Excel from mangling it
-                format!("\t{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Rx Frequency
-                format!("\t{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Tx Frequency
+                format!("\t{:0.5}", channel.frequency_rx.mhz()), // Rx Frequency
+                format!("\t{:0.5}", channel.frequency_tx.mhz()), // Tx Frequency
                 format!("{}", channel.fm.as_ref().unwrap().bandwidth.khz()), // Bandwidth
                 "".to_string(), // Colour Code
                 "".to_string(), // Timeslot
@@ -558,8 +557,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
                 channel.name.clone(), // Channel Name
                 "Digital".to_string(), // Channel Type
                 // put a tab in front to prevent Excel from mangling it
-                format!("\t{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Rx Frequency
-                format!("\t{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Tx Frequency
+                format!("\t{:0.5}", channel.frequency_rx.mhz()), // Rx Frequency
+                format!("\t{:0.5}", channel.frequency_tx.mhz()), // Tx Frequency
                 "".to_string(), // Bandwidth
                 channel.dmr.as_ref().unwrap().color_code.to_string(), // Colour Code
                 channel.dmr.as_ref().unwrap().timeslot.to_string(), // Timeslot
