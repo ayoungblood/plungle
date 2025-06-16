@@ -16,7 +16,7 @@ use crate::structures::Codeplug;
 pub fn parse_codeplug(opt: &Opt, model: &String, input: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     // build up a hashmap of function pointers
-    let mut read_functions: HashMap<&str, fn(&PathBuf, &Opt) -> Result<Codeplug, Box<dyn Error>>>
+    let mut read_functions: HashMap<&str, fn(&Opt, &PathBuf) -> Result<Codeplug, Box<dyn Error>>>
         = HashMap::new();
     read_functions.insert("ailunce_hd1", ailunce_hd1::read);
     read_functions.insert("alinco_djmd5t", alinco_djmd5t::read);
@@ -27,7 +27,7 @@ pub fn parse_codeplug(opt: &Opt, model: &String, input: &PathBuf) -> Result<Code
 
     // look up the radio model in the hashmap
     if let Some(read_function) = read_functions.get(model.as_str()) {
-        return read_function(input, opt);
+        return read_function(opt, input);
     } else {
         uprintln!(opt, Stderr, Color::Red, None, "Unsupported radio model for operation parse: {}", model);
         uprintln!(opt, Stderr, None, None, "Operation \"parse\" supports the following radio models:");
@@ -41,7 +41,7 @@ pub fn parse_codeplug(opt: &Opt, model: &String, input: &PathBuf) -> Result<Code
 pub fn generate_codeplug(opt: &Opt, codeplug: &Codeplug, model: &String, output: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     // build up a hashmap of function pointers
-    let mut write_functions: HashMap<&str, fn(&Codeplug, &PathBuf, &Opt) -> Result<(), Box<dyn Error>>>
+    let mut write_functions: HashMap<&str, fn(&Opt, &Codeplug, &PathBuf) -> Result<(), Box<dyn Error>>>
         = HashMap::new();
     write_functions.insert("ailunce_hd1", ailunce_hd1::write);
     write_functions.insert("alinco_djmd5t", alinco_djmd5t::write);
@@ -52,7 +52,7 @@ pub fn generate_codeplug(opt: &Opt, codeplug: &Codeplug, model: &String, output:
 
     // look up the radio model in the hashmap
     if let Some(write_function) = write_functions.get(model.as_str()) {
-        return write_function(codeplug, output, opt);
+        return write_function(opt, codeplug, output);
     } else {
         uprintln!(opt, Stderr, Color::Red, None, "Unsupported radio model for operation write: {}", model);
         uprintln!(opt, Stderr, None, None, "Operation \"write\" supports the following radio models:");

@@ -103,7 +103,7 @@ fn parse_tone(tone: &str) -> Option<Tone> {
     return Some(Tone::Ctcss(tone.parse::<f64>().unwrap()));
 }
 
-fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
+fn parse_channel_record(opt: &Opt, record: &CsvRecord) -> Result<Channel, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "{:?}", record);
 
     let mut channel = Channel::default();
@@ -168,7 +168,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
     Ok(channel)
 }
 
-pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
+pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
@@ -191,7 +191,7 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to Channel struct
-            let channel = parse_channel_record(&record, &opt)?;
+            let channel = parse_channel_record(&opt, &record)?;
             if channel.index > 0 {
                 // append to codpelug.channels
                 codeplug.channels.push(channel);
@@ -204,7 +204,7 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
 
 // WRITE //////////////////////////////////////////////////////////////////////
 
-pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+pub fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
@@ -262,7 +262,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
     Ok(())
 }
 
-pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
@@ -289,7 +289,7 @@ pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<()
     // write to Channels.csv
     let mut channels_path: PathBuf = output_path.clone();
     channels_path.push("Channels.CSV");
-    write_channels(codeplug, &channels_path, opt)?;
+    write_channels(&opt, codeplug, &channels_path)?;
 
     Ok(())
 }

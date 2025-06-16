@@ -91,7 +91,7 @@ type CsvRecord = HashMap<String, String>;
 
 // READ ///////////////////////////////////////////////////////////////////////
 
-fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup, Box<dyn Error>> {
+fn parse_talkgroup_record(opt: &Opt, record: &CsvRecord) -> Result<DmrTalkgroup, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     static TALKGROUP_INDEX: AtomicUsize = AtomicUsize::new(1);
     let talkgroup = DmrTalkgroup {
@@ -134,7 +134,7 @@ fn get_talkgroup_by_index(index: u32, codeplug: &Codeplug) -> Option<String> {
     Some(codeplug.talkgroups[index as usize - 1].name.clone())
 }
 
-fn parse_channel_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
+fn parse_channel_record(opt: &Opt, record: &CsvRecord, codeplug: &Codeplug) -> Result<Channel, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     let mut channel = Channel::default();
 
@@ -202,7 +202,7 @@ fn parse_channel_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> R
     Ok(channel)
 }
 
-pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
+pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
@@ -233,7 +233,7 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CsvRecord to Contact struct
-            let talkgroup = parse_talkgroup_record(&record, &opt)?;
+            let talkgroup = parse_talkgroup_record(&opt, &record)?;
             // append to codeplug.contacts
             codeplug.talkgroups.push(talkgroup);
         }
@@ -261,7 +261,7 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
     for result in reader.deserialize() {
         let record: CsvRecord = result?;
         // convert from CsvRecord to Channel struct
-        let channel = parse_channel_record(&record, &codeplug, &opt)?;
+        let channel = parse_channel_record(&opt, &record, &codeplug)?;
         // append to codeplug.channels
         codeplug.channels.push(channel);
     }
@@ -271,7 +271,7 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
 
 // WRITE //////////////////////////////////////////////////////////////////////
 
-fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+fn write_talkgroups(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
@@ -365,7 +365,7 @@ fn write_power(power: &Power) -> String {
     }
 }
 
-fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
@@ -550,7 +550,7 @@ fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), 
     Ok(())
 }
 
-pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
@@ -578,13 +578,13 @@ pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<()
     let mut contacts_path = output_path.clone();
     contacts_path.push("contacts.csv");
     if codeplug.talkgroups.len() > 0 {
-        write_talkgroups(&codeplug, &contacts_path, opt)?;
+        write_talkgroups(opt, &codeplug, &contacts_path)?;
     }
 
     // write channels.csv
     let mut channels_path = output_path.clone();
     channels_path.push("channels.csv");
-    write_channels(&codeplug, &channels_path, opt)?;
+    write_channels(opt, &codeplug, &channels_path)?;
 
     Ok(())
 }

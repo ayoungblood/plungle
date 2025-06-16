@@ -90,7 +90,7 @@ pub fn get_props() -> &'static structures::RadioProperties {
 
 // READ ///////////////////////////////////////////////////////////////////////
 
-pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
+pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
@@ -112,5 +112,3 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
 }
 
 // WRITE //////////////////////////////////////////////////////////////////////
-
-

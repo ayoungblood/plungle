@@ -89,7 +89,7 @@ type CsvRecord = HashMap<String, String>;
 
 // READ ///////////////////////////////////////////////////////////////////////
 
-pub fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgroup, Box<dyn Error>> {
+pub fn parse_talkgroup_record(opt: &Opt, record: &CsvRecord) -> Result<DmrTalkgroup, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     static TALKGROUP_INDEX: AtomicUsize = AtomicUsize::new(1);
     let talkgroup = DmrTalkgroup {
@@ -107,7 +107,7 @@ pub fn parse_talkgroup_record(record: &CsvRecord, opt: &Opt) -> Result<DmrTalkgr
     Ok(talkgroup)
 }
 
-pub fn parse_talkgroup_list_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<DmrTalkgroupList, Box<dyn Error>> {
+pub fn parse_talkgroup_list_record(opt: &Opt, record: &CsvRecord, codeplug: &Codeplug) -> Result<DmrTalkgroupList, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     static TALKGROUP_LIST_INDEX: AtomicUsize = AtomicUsize::new(1);
     let mut talkgroup_list = DmrTalkgroupList {
@@ -187,7 +187,7 @@ fn parse_squelch(squelch: &str) -> Squelch {
     }
 }
 
-pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dyn Error>> {
+pub fn parse_channel_record(opt: &Opt, record: &CsvRecord) -> Result<Channel, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     let mut channel = Channel::default();
 
@@ -243,7 +243,7 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
     Ok(channel)
 }
 
-pub fn parse_zone_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> Result<Zone, Box<dyn Error>> {
+pub fn parse_zone_record(opt: &Opt, record: &CsvRecord, codeplug: &Codeplug) -> Result<Zone, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 4, "    {:?}", record);
     static ZONE_INDEX: AtomicUsize = AtomicUsize::new(1);
     let mut zone = Zone {
@@ -268,7 +268,7 @@ pub fn parse_zone_record(record: &CsvRecord, codeplug: &Codeplug, opt: &Opt) -> 
     Ok(zone)
 }
 
-pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>> {
+pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
@@ -291,7 +291,7 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to DmrTalkgroup struct
-            let talkgroup = parse_talkgroup_record(&record, &opt)?;
+            let talkgroup = parse_talkgroup_record(&opt, &record)?;
             // append to codeplug.talkgroups
             codeplug.talkgroups.push(talkgroup);
         }
@@ -308,7 +308,7 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to DmrTalkgroupList struct
-            let talkgroup_list = parse_talkgroup_list_record(&record, &codeplug, &opt)?;
+            let talkgroup_list = parse_talkgroup_list_record(&opt, &record, &codeplug)?;
             // append to codeplug.talkgroup_lists
             codeplug.talkgroup_lists.push(talkgroup_list);
         }
@@ -325,7 +325,7 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to Channel struct
-            let channel = parse_channel_record(&record, &opt)?;
+            let channel = parse_channel_record(opt, &record)?;
             // append to codeplug.channels
             codeplug.channels.push(channel);
         }
@@ -341,7 +341,7 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
         for result in reader.deserialize() {
             let record: CsvRecord = result?;
             // convert from CSV record to Zone struct
-            let zone = parse_zone_record(&record, &codeplug, &opt)?;
+            let zone = parse_zone_record(opt, &record, &codeplug)?;
             // append to codeplug.zones
             codeplug.zones.push(zone);
         }
@@ -351,7 +351,7 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
 
 // WRITE //////////////////////////////////////////////////////////////////////
 
-pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+pub fn write_talkgroups(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
@@ -386,7 +386,7 @@ pub fn write_talkgroups(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Resul
     Ok(())
 }
 
-pub fn write_talkgroup_lists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+pub fn write_talkgroup_lists(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
@@ -477,7 +477,7 @@ fn write_tx_tot(tx_tot: &Timeout) -> String {
     }
 }
 
-pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+pub fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
@@ -601,7 +601,7 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
     Ok(())
 }
 
-fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+fn write_zones(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
@@ -632,7 +632,7 @@ fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(), Box
     Ok(())
 }
 
-pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
+pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
@@ -660,26 +660,26 @@ pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<()
     let mut talkgroups_path: PathBuf = output_path.clone();
     talkgroups_path.push("Contacts.csv");
     if codeplug.talkgroups.len() > 0 {
-        write_talkgroups(&codeplug, &talkgroups_path, opt)?;
+        write_talkgroups(opt, &codeplug, &talkgroups_path)?;
     }
 
     // write to TG_Lists.csv
     let mut talkgroup_lists_path: PathBuf = output_path.clone();
     talkgroup_lists_path.push("TG_Lists.csv");
     if codeplug.talkgroup_lists.len() > 0 {
-        write_talkgroup_lists(&codeplug, &talkgroup_lists_path, opt)?;
+        write_talkgroup_lists(opt, &codeplug, &talkgroup_lists_path)?;
     }
 
     // write to Channels.csv
     let mut channels_path: PathBuf = output_path.clone();
     channels_path.push("Channels.csv");
-    write_channels(&codeplug, &channels_path, opt)?;
+    write_channels(opt, &codeplug, &channels_path)?;
 
     // write to Zones.csv
     let mut zones_path: PathBuf = output_path.clone();
     zones_path.push("Zones.csv");
     if codeplug.zones.len() > 0 {
-        write_zones(&codeplug, &zones_path, opt)?;
+        write_zones(opt, &codeplug, &zones_path)?;
     }
 
     Ok(())
