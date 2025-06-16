@@ -1,53 +1,53 @@
 use std::fmt;
 use std::num::ParseFloatError;
-use std::ops::{Add, Sub};
+use std::ops::{Add, Sub, Mul, Div};
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, PartialOrd, Eq, Ord, serde::Serialize, serde::Deserialize)]
 pub struct Frequency {
-    pub freq_hz: f64,
+    pub freq_uhz: i64,
 }
 
 #[allow(unused)]
 impl Frequency {
     pub fn new() -> Self {
-        Frequency { freq_hz: 0.0 }
+        Frequency { freq_uhz: 0 }
     }
 
     pub fn from_hz(freq_hz: f64) -> Self {
-        Frequency { freq_hz }
+        Frequency { freq_uhz: (freq_hz * 1_000_000.0) as i64 }
     }
     pub fn from_khz(freq_khz: f64) -> Self {
-        Frequency { freq_hz: freq_khz * 1000.0 }
+        Frequency { freq_uhz: (freq_khz * 1_000_000_000.0) as i64 }
     }
     pub fn from_mhz(freq_mhz: f64) -> Self {
-        Frequency { freq_hz: freq_mhz * 1_000_000.0 }
+        Frequency { freq_uhz: (freq_mhz * 1_000_000_000_000.0) as i64 }
     }
     pub fn from_ghz(freq_ghz: f64) -> Self {
-        Frequency { freq_hz: freq_ghz * 1_000_000_000.0 }
+        Frequency { freq_uhz: (freq_ghz * 1_000_000_000_000_000.0) as i64 }
     }
 
     pub fn hz(&self) -> f64 {
-        self.freq_hz
+        self.freq_uhz as f64 / 1_000_000.0
     }
     pub fn khz(&self) -> f64 {
-        self.freq_hz / 1000.0
+        self.freq_uhz as f64 / 1_000_000_000.0
     }
     pub fn mhz(&self) -> f64 {
-        self.freq_hz / 1_000_000.0
+        self.freq_uhz as f64 / 1_000_000_000_000.0
     }
     pub fn ghz(&self) -> f64 {
-        self.freq_hz / 1_000_000_000.0
+        self.freq_uhz as f64 / 1_000_000_000_000_000.0
     }
 
     pub fn to_pretty_str(&self) -> String {
-        if self.freq_hz < 1000.0 {
-            format!("{:.} Hz", self.freq_hz)
-        } else if self.freq_hz < 1_000_000.0 {
-            format!("{:.} kHz", self.freq_hz / 1000.0)
-        } else if self.freq_hz < 1_000_000_000.0 {
-            format!("{:.} MHz", self.freq_hz / 1_000_000.0)
+        if self.hz() < 1000.0 {
+            format!("{:.} Hz", self.hz())
+        } else if self.hz() < 1_000_000.0 {
+            format!("{:.} kHz", self.khz())
+        } else if self.hz() < 1_000_000_000.0 {
+            format!("{:.} MHz", self.mhz())
         } else {
-            format!("{:.} GHz", self.freq_hz / 1_000_000_000.0)
+            format!("{:.} GHz", self.ghz())
         }
     }
 
@@ -56,28 +56,36 @@ impl Frequency {
             .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
             .collect::<String>()
             .parse()
-            .map(|freq_hz| Frequency { freq_hz })
+            .map(|freq_hz: f64| Frequency { freq_uhz: (freq_hz * 1_000_000.0) as i64 })
     }
     pub fn from_khz_str(str: &str) -> Result<Self, ParseFloatError> {
         str.chars()
             .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
             .collect::<String>()
             .parse()
-            .map(|freq_khz: f64| Frequency { freq_hz: freq_khz * 1000.0 })
+            .map(|freq_khz: f64| Frequency { freq_uhz: (freq_khz * 1_000_000_000.0) as i64 })
     }
     pub fn from_mhz_str(str: &str) -> Result<Self, ParseFloatError> {
         str.chars()
             .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
             .collect::<String>()
             .parse()
-            .map(|freq_mhz: f64| Frequency { freq_hz: freq_mhz * 1_000_000.0 })
+            .map(|freq_mhz: f64| Frequency { freq_uhz: (freq_mhz * 1_000_000_000_000.0) as i64 })
     }
     pub fn from_ghz_str(str: &str) -> Result<Self, ParseFloatError> {
         str.chars()
             .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
             .collect::<String>()
             .parse()
-            .map(|freq_ghz: f64| Frequency { freq_hz: freq_ghz * 1_000_000_000.0 })
+            .map(|freq_ghz: f64| Frequency { freq_uhz: (freq_ghz * 1_000_000_000_000_000.0) as i64 })
+    }
+
+    pub fn abs(&self) -> Self {
+        if self.freq_uhz < 0 {
+            Frequency { freq_uhz: -self.freq_uhz }
+        } else {
+            *self
+        }
     }
 }
 
@@ -85,7 +93,7 @@ impl Add for Frequency {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        Frequency { freq_hz: self.freq_hz + other.freq_hz }
+        Frequency { freq_uhz: self.freq_uhz + other.freq_uhz }
     }
 }
 
@@ -93,7 +101,23 @@ impl Sub for Frequency {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        Frequency { freq_hz: self.freq_hz - other.freq_hz }
+        Frequency { freq_uhz: self.freq_uhz - other.freq_uhz }
+    }
+}
+
+impl Mul<f64> for Frequency {
+    type Output = Self;
+
+    fn mul(self, other: f64) -> Self {
+        Frequency { freq_uhz: (self.freq_uhz as f64 * other) as i64 }
+    }
+}
+
+impl Div<f64> for Frequency {
+    type Output = Self;
+
+    fn div(self, other: f64) -> Self {
+        Frequency { freq_uhz: (self.freq_uhz as f64 / other) as i64 }
     }
 }
 
@@ -101,10 +125,10 @@ impl fmt::Display for Frequency {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(precision) = f.precision() {
             // If a precision was specified, format the f64 with that precision
-                write!(f, "{:.width$} Hz", self.freq_hz, width = precision)
+                write!(f, "{:.width$} Hz", self.hz(), width = precision)
             } else {
                 // Otherwise, use the default formatting for Display
-                write!(f, "{} Hz", self.freq_hz)
+                write!(f, "{} Hz", self.hz())
             }
     }
 }
@@ -113,11 +137,12 @@ impl fmt::Display for Frequency {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cmp::{min, max};
 
     #[test]
     fn test_new_frequency() {
         let freq = Frequency::new();
-        assert_eq!(freq.freq_hz, 0.0);
+        assert_eq!(freq.freq_uhz, 0);
     }
 
     #[test]
@@ -165,6 +190,77 @@ mod tests {
         let f3 = Frequency::from_mhz(123.0);
         let diff = f1 - f2 - f3;
         assert_eq!(diff.hz(), 789.0 - 456000.0 - 123000000.0);
+    }
+
+    #[test]
+    fn test_mul() {
+        let f1 = Frequency::from_hz(789.0);
+        let f2 = Frequency::from_khz(456.0);
+        let product = f1 * 1000.0;
+        assert_eq!(product, Frequency::from_khz(789.0));
+        let product = f2 * 11.0;
+        assert_eq!(product, Frequency::from_khz(5016.0));
+    }
+
+    #[test]
+    fn test_div() {
+        let f1 = Frequency::from_hz(789.0);
+        let f2 = Frequency::from_khz(456.0);
+        let quotient = f1 / 1000.0;
+        assert_eq!(quotient, Frequency::from_hz(0.789));
+        let quotient = f2 / 11.0;
+        assert_eq!(quotient, Frequency::from_khz(41.45454545454545));
+    }
+
+    #[test]
+    fn test_abs() {
+        let f1 = Frequency::from_hz(-789.0);
+        let f2 = Frequency::from_khz(456.0);
+        let f3 = Frequency::from_mhz(-123.0);
+        assert_eq!(f1.abs(), Frequency::from_hz(789.0));
+        assert_eq!(f2.abs(), Frequency::from_khz(456.0));
+        assert_eq!(f3.abs(), Frequency::from_mhz(123.0));
+    }
+
+    #[test]
+    fn test_compare() {
+        let f1 = Frequency::from_hz(0.789);
+        let f2 = Frequency::from_khz(456.0);
+        let f3 = Frequency::from_mhz(123.0);
+        let f4 = Frequency::from_hz(0.789);
+        assert!(f1 < f2);
+        assert!(f3 > f2);
+        assert!(f3 >= f1);
+        assert!(f1 <= f3);
+        assert!(f1 == f4);
+        assert!(f1 != f2);
+    }
+
+    #[test]
+    fn test_min_max_sort() {
+        let mut freqs = vec![
+            Frequency::from_hz(1.15),
+            Frequency::from_khz(25.55575),
+            Frequency::from_mhz(1.0),
+            Frequency::from_khz(1.1),
+            Frequency::from_hz(0.789),
+        ];
+        let min = min(freqs[0], freqs[1]);
+        let max = max(freqs[1], freqs[2]);
+        assert_eq!(min, Frequency::from_hz(1.15));
+        assert_eq!(max, Frequency::from_mhz(1.0));
+        let vec_max = freqs.iter().max().unwrap();
+        assert_eq!(vec_max, &Frequency::from_mhz(1.0));
+        let vec_min = freqs.iter().min().unwrap();
+        assert_eq!(vec_min, &Frequency::from_hz(0.789));
+        freqs.sort();
+        assert_eq!(freqs, vec![
+            Frequency::from_hz(0.789),
+            Frequency::from_hz(1.15),
+            Frequency::from_khz(1.1),
+            Frequency::from_khz(25.55575),
+            Frequency::from_mhz(1.0),
+        ]);
     }
 
     #[test]
