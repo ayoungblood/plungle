@@ -254,8 +254,8 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
         "D-Digital" => ChannelMode::DMR,
         _ => return Err(format!("Unrecognized channel type: {}", record.get("Channel Type").unwrap()).into()),
     };
-    channel.frequency_rx = Frequency::from_mhz_str(record.get("Receive Frequency").unwrap()).unwrap();
-    channel.frequency_tx = Frequency::from_mhz_str(record.get("Transmit Frequency").unwrap()).unwrap();
+    channel.frequency_rx = Frequency::from_mhz_str(record.get("Receive Frequency").unwrap())?;
+    channel.frequency_tx = Frequency::from_mhz_str(record.get("Transmit Frequency").unwrap())?;
     channel.rx_only = record.get("PTT Prohibit").unwrap() == "On";
     if channel.frequency_tx >= Frequency::from_mhz(174.0) { // VHF
         channel.power = match record.get("Transmit Power").unwrap().as_str() {
@@ -281,7 +281,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
     };
     if channel.mode == ChannelMode::FM { // FM specific fields
         channel.fm = Some(FmChannel {
-            bandwidth: Frequency::from_khz_str(record.get("Band Width").unwrap().as_str()).unwrap(),
+            bandwidth: Frequency::from_khz_str(record.get("Band Width").unwrap().as_str())?,
             squelch: Squelch::Default,
             tone_rx: parse_tone(record.get("CTCSS/DCS Decode").unwrap().as_str()),
             tone_tx: parse_tone(record.get("CTCSS/DCS Encode").unwrap().as_str()),

@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use crate::*;
 use std::io::Write;
+
+use crate::*;
 use crate::frequency::Frequency;
 
 /// Band

@@ -125,8 +125,8 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
         "Digital CH" => ChannelMode::DMR,
         _ => return Err(format!("Unrecognized channel type: {}", record.get("Channel Type").unwrap()).into()),
     };
-    channel.frequency_rx = Frequency::from_mhz_str(record.get("Rx Frequency").unwrap()).unwrap();
-    channel.frequency_tx = Frequency::from_mhz_str(record.get("Tx Frequency").unwrap()).unwrap();
+    channel.frequency_rx = Frequency::from_mhz_str(record.get("Rx Frequency").unwrap())?;
+    channel.frequency_tx = Frequency::from_mhz_str(record.get("Tx Frequency").unwrap())?;
     channel.rx_only = record.get("Tx Authority").unwrap() == "Prohibit TX";
     if record.get("TOT").unwrap() == "Endless" {
         channel.tx_tot = Timeout::Infinite;
@@ -150,7 +150,7 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
     }
     if channel.mode == ChannelMode::FM { // FM specific fields
         channel.fm = Some(FmChannel {
-            bandwidth: Frequency::from_khz_str(record.get("Band Width").unwrap()).unwrap(),
+            bandwidth: Frequency::from_khz_str(record.get("Band Width").unwrap())?,
             squelch: Squelch::Default,
             tone_rx: parse_tone(record.get("Dec QT/DQT").unwrap()),
             tone_tx: parse_tone(record.get("Enc QT/DQT").unwrap()),
