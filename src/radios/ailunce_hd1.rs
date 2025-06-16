@@ -5,7 +5,6 @@ use std::fs;
 use std::path::PathBuf;
 use std::path::Path;
 use std::collections::HashMap;
-use rust_decimal::prelude::*;
 use std::sync::OnceLock;
 
 use crate::*;
@@ -126,15 +125,15 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
         "Digital CH" => ChannelMode::DMR,
         _ => return Err(format!("Unrecognized channel type: {}", record.get("Channel Type").unwrap()).into()),
     };
-    channel.frequency_rx = Decimal::from_str(record.get("Rx Frequency").unwrap())? * Decimal::new(1_000_000, 0);
-    channel.frequency_tx = Decimal::from_str(record.get("Tx Frequency").unwrap())? * Decimal::new(1_000_000, 0);
+    channel.frequency_rx = Frequency::from_mhz_str(record.get("Rx Frequency").unwrap()).unwrap();
+    channel.frequency_tx = Frequency::from_mhz_str(record.get("Tx Frequency").unwrap()).unwrap();
     channel.rx_only = record.get("Tx Authority").unwrap() == "Prohibit TX";
     if record.get("TOT").unwrap() == "Endless" {
         channel.tx_tot = Timeout::Infinite;
     } else {
         channel.tx_tot = Timeout::Seconds(record.get("TOT").unwrap().strip_suffix("S").unwrap().parse::<u32>()?);
     }
-    if channel.frequency_tx <= Decimal::new(174_000_000, 0) { // VHF
+    if channel.frequency_tx <= Frequency::from_mhz(174.0) { // VHF
         channel.power = match record.get("Tx Power").unwrap().as_str() {
             "Low" => Power::Watts(1.0),
             "Mid" => Power::Watts(5.0),

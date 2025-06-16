@@ -1,6 +1,6 @@
 // src/helpers.rs
 
-use rust_decimal::prelude::ToPrimitive;
+use crate::frequency::Frequency;
 use clap::ValueEnum;
 
 #[derive(Debug, Clone, ValueEnum, PartialEq, Default)]
@@ -182,8 +182,8 @@ macro_rules! function {
 }
 
 // print a Decimal as a frequency
-pub fn freq2str(freq: &rust_decimal::Decimal) -> String {
-    let f = freq.to_f64().unwrap();
+pub fn freq2str(freq: &Frequency) -> String {
+    let f: f64 = freq.hz();
     if f >= 1e9 {
         return format!("{:8.4} GHz", f/1e9)
     } else if f >= 1e6 {

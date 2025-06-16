@@ -6,7 +6,6 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::path::Path;
 use std::collections::HashMap;
-use rust_decimal::prelude::*;
 use std::sync::OnceLock;
 use std::cmp::{max, min};
 
@@ -156,10 +155,10 @@ pub fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Bo
         channel.index = record.get("Location").unwrap().parse::<usize>()? + 1;
         channel.name = record.get("Name").unwrap().to_string();
         channel.mode = ChannelMode::FM;
-        channel.frequency_rx = Decimal::from_str(record.get("Frequency").unwrap())? * Decimal::new(1_000_000, 0);
+        channel.frequency_rx = Frequency::from_mhz_str(record.get("Frequency").unwrap())?;
         let offset = match record.get("Offset").unwrap().as_str() {
-            "" => Decimal::new(0, 0),
-            s => Decimal::from_str(s)? * Decimal::new(1_000_000, 0),
+            "" => Frequency::from_hz(0.0),
+            s => Frequency::from_mhz_str(s)?,
         };
         channel.frequency_tx = match record.get("Duplex").unwrap().as_str() {
             "+" => channel.frequency_rx + offset,
@@ -235,13 +234,13 @@ pub fn read(input_path: &PathBuf, opt: &Opt) -> Result<Codeplug, Box<dyn Error>>
 fn write_frequencies(channel: &Channel) -> (String, String, String) {
     if channel.rx_only {
         (
-            format!("{:0.6}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()),
+            format!("{:0.6}", channel.frequency_rx.mhz()),
             "off".to_string(),
             "0.600000".to_string(), // default (sometimes this is 0.500000, no idea why)
         )
     } else if channel.frequency_rx == channel.frequency_tx {
         (
-            format!("{:0.6}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()),
+            format!("{:0.6}", channel.frequency_rx.mhz()),
             "".to_string(),
             "0.600000".to_string(), // default
         )
@@ -251,21 +250,21 @@ fn write_frequencies(channel: &Channel) -> (String, String, String) {
         let high = max(channel.frequency_rx, channel.frequency_tx);
         let low = min(channel.frequency_rx, channel.frequency_tx);
         let diff = high - low;
-        if (diff / high) > (Decimal::new(15, 0) / Decimal::new(100, 0)) {
+        if (diff.hz() / high.hz()) > 0.15 {
             // crossband
             return (
-                format!("{:0.6}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()),
+                format!("{:0.6}", channel.frequency_rx.mhz()),
                 "split".to_string(),
-                format!("{:0.6}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()),
+                format!("{:0.6}", channel.frequency_tx.mhz()),
             )
         } else {
             // same band
             let offset = channel.frequency_tx - channel.frequency_rx;
-            let plus = offset > Decimal::new(0, 0);
+            let plus = offset.hz() > 0.0;
             return (
-                format!("{:0.6}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()),
+                format!("{:0.6}", channel.frequency_rx.mhz()),
                 if plus { "+".to_string() } else { "-".to_string() },
-                format!("{:0.6}", ((if plus { offset } else { -offset }) / Decimal::new(1_000_000, 0)).to_f64().unwrap()),
+                format!("{:0.6}", if plus { offset.mhz() } else { -offset.mhz() }),
             )
         }
     }

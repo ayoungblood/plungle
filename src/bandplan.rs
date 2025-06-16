@@ -1,19 +1,19 @@
 // src/bandplan.rs
 
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use crate::*;
 use std::io::Write;
+use crate::frequency::Frequency;
 
 /// Band
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Band {
     pub name: String,
-    pub ranges: Vec<(Decimal, Decimal)>,
-    pub nominal_offsets: Option<Vec<Decimal>>,
+    pub ranges: Vec<(Frequency, Frequency)>,
+    pub nominal_offsets: Option<Vec<Frequency>>,
     pub is_amateur: bool,
 }
 
@@ -50,56 +50,56 @@ pub fn try_write_bandplan(path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error
             bands: vec![
                 Band {
                     name: String::from("Amateur 10m"),
-                    ranges: vec![(Decimal::from(28_000_000), Decimal::from(29_700_000))],
-                    nominal_offsets: Some(vec![Decimal::from(100_000)]), // 100 kHz
+                    ranges: vec![(Frequency::from_mhz(28.000), Frequency::from_mhz(29.700))],
+                    nominal_offsets: Some(vec![Frequency::from_khz(100.0)]), // 100 kHz
                     is_amateur: true,
                 },
                 Band {
                     name: String::from("Amateur 6m"),
-                    ranges: vec![(Decimal::from(50_000_000), Decimal::from(54_000_000))],
-                    nominal_offsets: Some(vec![Decimal::from(500_000), Decimal::from(1_000_000)]), // 500 kHz, 1 MHz
+                    ranges: vec![(Frequency::from_mhz(50.0), Frequency::from_mhz(54.0))],
+                    nominal_offsets: Some(vec![Frequency::from_khz(500.0), Frequency::from_mhz(1.0)]), // 500 kHz, 1 MHz
                     is_amateur: true,
                 },
                 Band {
                     name: String::from("Amateur 2m"),
-                    ranges: vec![(Decimal::from(144_000_000), Decimal::from(148_000_000))],
-                    nominal_offsets: Some(vec![Decimal::from(600_000)]), // 600 kHz
+                    ranges: vec![(Frequency::from_mhz(144.0), Frequency::from_mhz(148.0))],
+                    nominal_offsets: Some(vec![Frequency::from_khz(600.0)]), // 600 kHz
                     is_amateur: true,
                 },
                 Band {
                     name: String::from("MURS"),
-                    ranges: vec![(Decimal::from(151_820_000), Decimal::from(151_940_000)), (Decimal::from(154_570_000), Decimal::from(154_600_000))],
+                    ranges: vec![(Frequency::from_mhz(151.82), Frequency::from_mhz(151.94)), (Frequency::from_mhz(154.57), Frequency::from_mhz(154.60))],
                     nominal_offsets: None,
                     is_amateur: false,
                 },
                 Band {
                     name: String::from("Amateur 1.25m"),
-                    ranges: vec![(Decimal::from(219_000_000), Decimal::from(225_000_000))],
-                    nominal_offsets: Some(vec![Decimal::from(1_600_000)]), // 1.6 MHz
+                    ranges: vec![(Frequency::from_mhz(219.0), Frequency::from_mhz(225.0))],
+                    nominal_offsets: Some(vec![Frequency::from_mhz(1.6)]), // 1.6 MHz
                     is_amateur: true,
                 },
                 Band {
                     name: String::from("Amateur 70cm"),
-                    ranges: vec![(Decimal::from(420_000_000), Decimal::from(450_000_000))],
-                    nominal_offsets: Some(vec![Decimal::from(5_000_000)]), // 5 MHz
+                    ranges: vec![(Frequency::from_mhz(420.0), Frequency::from_mhz(450.0))],
+                    nominal_offsets: Some(vec![Frequency::from_mhz(5.0)]), // 5 MHz
                     is_amateur: true,
                 },
                 Band {
                     name: String::from("FRS/GMRS"),
-                    ranges: vec![(Decimal::from(462_550_000), Decimal::from(462_725_000)), (Decimal::from(467_550_000), Decimal::from(467_725_000))],
-                    nominal_offsets: Some(vec![Decimal::from(5_000_000)]), // 5 MHz
+                    ranges: vec![(Frequency::from_mhz(462.55), Frequency::from_mhz(462.725)), (Frequency::from_mhz(467.55), Frequency::from_mhz(467.725))],
+                    nominal_offsets: Some(vec![Frequency::from_mhz(5.0)]), // 5 MHz
                     is_amateur: false,
                 },
                 Band {
                     name: String::from("Amateur 33cm"),
-                    ranges: vec![(Decimal::from(902_000_000), Decimal::from(928_000_000))],
-                    nominal_offsets: Some(vec![Decimal::from(12_000_000), Decimal::from(25_000_000)]), // 12 MHz, 25 MHz
+                    ranges: vec![(Frequency::from_mhz(902.0), Frequency::from_mhz(928.0))],
+                    nominal_offsets: Some(vec![Frequency::from_mhz(12.0), Frequency::from_mhz(25.0)]),
                     is_amateur: true,
                 },
                 Band {
                     name: String::from("Amateur 23cm"),
-                    ranges: vec![(Decimal::from(1_240_000_000), Decimal::from(1_300_000_000))],
-                    nominal_offsets: Some(vec![Decimal::from(12_000_000), Decimal::from(20_000_000)]), // 12 MHz, 20 MHz
+                    ranges: vec![(Frequency::from_ghz(1.240), Frequency::from_ghz(1.300))],
+                    nominal_offsets: Some(vec![Frequency::from_mhz(12.0), Frequency::from_mhz(20.0)]), // 12 MHz, 20 MHz
                     is_amateur: true,
                 }
             ],
@@ -111,10 +111,10 @@ pub fn try_write_bandplan(path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error
     Ok(())
 }
 
-pub fn get_band(bandplan: &Bandplan, frequency: Decimal) -> Option<&Band> {
+pub fn get_band<'a>(bandplan: &'a Bandplan, frequency: &Frequency) -> Option<&'a Band> {
     for band in &bandplan.bands {
         for range in &band.ranges {
-            if frequency >= range.0 && frequency <= range.1 {
+            if *frequency >= range.0 && *frequency <= range.1 {
                 return Some(band);
             }
         }

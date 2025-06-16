@@ -6,7 +6,6 @@ use std::fs;
 use std::path::PathBuf;
 use std::path::Path;
 use std::collections::HashMap;
-use rust_decimal::prelude::*;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -255,10 +254,10 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
         "D-Digital" => ChannelMode::DMR,
         _ => return Err(format!("Unrecognized channel type: {}", record.get("Channel Type").unwrap()).into()),
     };
-    channel.frequency_rx = Decimal::from_str(record.get("Receive Frequency").unwrap())? * Decimal::new(1_000_000, 0);
-    channel.frequency_tx = Decimal::from_str(record.get("Transmit Frequency").unwrap())? * Decimal::new(1_000_000, 0);
+    channel.frequency_rx = Frequency::from_mhz_str(record.get("Receive Frequency").unwrap()).unwrap();
+    channel.frequency_tx = Frequency::from_mhz_str(record.get("Transmit Frequency").unwrap()).unwrap();
     channel.rx_only = record.get("PTT Prohibit").unwrap() == "On";
-    if channel.frequency_tx >= Decimal::new(174_000_000, 0) { // VHF
+    if channel.frequency_tx >= Frequency::from_mhz(174.0) { // VHF
         channel.power = match record.get("Transmit Power").unwrap().as_str() {
             "Turbo" => Power::Watts(7.0), // 7W
             "High" => Power::Watts(5.0), // 5W
@@ -801,8 +800,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
             writer.write_record(&[
                 channel.index.to_string(), // No.
                 channel.name.clone(), // Channel Name
-                format!("{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
-                format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
+                format!("{:0.5}", channel.frequency_rx.mhz()), // Receive Frequency
+                format!("{:0.5}", channel.frequency_tx.mhz()), // Transmit Frequency
                 "A-Analog".to_string(), // Channel Type
                 write_power(&channel.power), // Transmit Power
                 format!("{}K", channel.fm.as_ref().unwrap().bandwidth.khz()), // Band Width
@@ -877,8 +876,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
             writer.write_record(&[
                 channel.index.to_string(), // No.
                 channel.name.clone(), // Channel Name
-                format!("{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
-                format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
+                format!("{:0.5}", channel.frequency_rx.mhz()), // Receive Frequency
+                format!("{:0.5}", channel.frequency_tx.mhz()), // Transmit Frequency
                 "D-Digital".to_string(), // Channel Type
                 write_power(&channel.power), // Transmit Power
                 "12.5K".to_string(), // Band Width
@@ -979,8 +978,8 @@ pub fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(),
             }
             let channel = codeplug.channels.iter().find(|&c| c.name == *name).unwrap();
             channel_names.push_str(&channel.name);
-            channel_rx_frequencies.push_str(&format!("{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()));
-            channel_tx_frequencies.push_str(&format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()));
+            channel_rx_frequencies.push_str(&format!("{:0.5}", channel.frequency_rx.mhz()));
+            channel_tx_frequencies.push_str(&format!("{:0.5}", channel.frequency_tx.mhz()));
         }
         // get the first channel in the zone
         let first_channel = codeplug.channels.iter().find(|&c| c.name == zone.channels[0]).unwrap();
@@ -993,11 +992,11 @@ pub fn write_zones(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<(),
             channel_rx_frequencies, // Zone Channel Member RX Frequency
             channel_tx_frequencies, // Zone Channel Member TX Frequency
             first_channel.name.clone(), // A Channel
-            format!("{:0.5}", (first_channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // A Channel RX Frequency
-            format!("{:0.5}", (first_channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // A Channel TX Frequency
+            format!("{:0.5}", first_channel.frequency_rx.mhz()), // A Channel RX Frequency
+            format!("{:0.5}", first_channel.frequency_tx.mhz()), // A Channel TX Frequency
             second_channel.name.clone(), // B Channel
-            format!("{:0.5}", (second_channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // B Channel RX Frequency
-            format!("{:0.5}", (second_channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // B Channel TX Frequency
+            format!("{:0.5}", second_channel.frequency_rx.mhz()), // B Channel RX Frequency
+            format!("{:0.5}", second_channel.frequency_tx.mhz()), // B Channel TX Frequency
             "0".to_string(), // Zone Hide
         ])?;
     }
@@ -1051,8 +1050,8 @@ pub fn write_scanlists(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result
             }
             let channel = codeplug.channels.iter().find(|&c| c.name == *name).unwrap();
             channel_names.push_str(&channel.name);
-            channel_rx_frequencies.push_str(&format!("{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()));
-            channel_tx_frequencies.push_str(&format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()));
+            channel_rx_frequencies.push_str(&format!("{:0.5}", channel.frequency_rx.mhz()));
+            channel_tx_frequencies.push_str(&format!("{:0.5}", channel.frequency_tx.mhz()));
         }
 
         writer.write_record(&[

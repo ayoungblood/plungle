@@ -5,7 +5,6 @@ use std::fs;
 use std::path::PathBuf;
 use std::path::Path;
 use std::collections::HashMap;
-use rust_decimal::prelude::*;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -213,8 +212,8 @@ fn parse_channel_record(record: &CsvRecord, opt: &Opt) -> Result<Channel, Box<dy
         "D-Digital" => ChannelMode::DMR,
         _ => return Err(format!("Unrecognized channel type: {}", record.get("Channel Type").unwrap()).into()),
     };
-    channel.frequency_rx = Decimal::from_str(record.get("Receive Frequency").unwrap())? * Decimal::new(1_000_000, 0);
-    channel.frequency_tx = Decimal::from_str(record.get("Transmit Frequency").unwrap())? * Decimal::new(1_000_000, 0);
+    channel.frequency_rx = Frequency::from_mhz_str(record.get("Receive Frequency").unwrap()).unwrap();
+    channel.frequency_tx = Frequency::from_mhz_str(record.get("Transmit Frequency").unwrap()).unwrap();
     channel.rx_only = record.get("TX Prohibit").unwrap() == "On";
     channel.power = match record.get("Transmit Power").unwrap().as_str() {
         // @TODO manual disagrees with CPS, no idea what these values are
@@ -680,8 +679,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
             writer.write_record(&[
                 channel.index.to_string(), // No.
                 channel.name.clone(), // Channel Name
-                format!("{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
-                format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
+                format!("{:0.5}", channel.frequency_rx.mhz()), // Receive Frequency
+                format!("{:0.5}", channel.frequency_tx.mhz()), // Transmit Frequency
                 "A-Analog".to_string(), // Channel Type
                 write_power(&channel.power), // Transmit Power
                 match channel.fm.clone().unwrap().bandwidth.khz() {
@@ -746,8 +745,8 @@ pub fn write_channels(codeplug: &Codeplug, path: &PathBuf, opt: &Opt) -> Result<
             writer.write_record(&[
                 channel.index.to_string(), // No.
                 channel.name.clone(), // Channel Name
-                format!("{:0.5}", (channel.frequency_rx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Receive Frequency
-                format!("{:0.5}", (channel.frequency_tx / Decimal::new(1_000_000, 0)).to_f64().unwrap()), // Transmit Frequency
+                format!("{:0.5}", channel.frequency_rx.mhz()), // Receive Frequency
+                format!("{:0.5}", channel.frequency_tx.mhz()), // Transmit Frequency
                 "D-Digital".to_string(), // Channel Type
                 write_power(&channel.power), // Transmit Power
                 "12.5K".to_string(), // Band Width

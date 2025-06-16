@@ -1,9 +1,9 @@
 // src/validate.rs
 
-use rust_decimal::prelude::*;
 use crate::*;
 use crate::structures::Codeplug;
 use crate::bandplan::Bandplan;
+use crate::frequency::Frequency;
 
 /// Severity
 #[derive(Debug, Default, PartialEq)]
@@ -46,8 +46,8 @@ pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &B
                 source_name: Some(channel.name.clone()),
             });
         }
-        let rx_band = bandplan::get_band(bandplan, channel.frequency_rx);
-        let tx_band = bandplan::get_band(bandplan, channel.frequency_tx);
+        let rx_band = bandplan::get_band(bandplan, &channel.frequency_rx);
+        let tx_band = bandplan::get_band(bandplan, &channel.frequency_tx);
         if tx_band.is_none() && rx_band.is_none() {
             // warn if we don't know either band
             complaints.push(Complaint {
@@ -90,7 +90,7 @@ pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &B
                 // compute the difference between RX and TX
                 let diff = (channel.frequency_tx - channel.frequency_rx).abs();
                 // if diff is non-zero and we have a nominal offset, warn
-                if diff != Decimal::new(0, 0) && tx_band.as_ref().unwrap().nominal_offsets.is_some() {
+                if diff != Frequency::from_hz(0.0) && tx_band.as_ref().unwrap().nominal_offsets.is_some() {
                     // check if diff matches one of the offsets
                     let mut matched = false;
                     for offset in tx_band.as_ref().unwrap().nominal_offsets.as_ref().unwrap() {
