@@ -184,16 +184,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, Color::Green, 1, "Welcome to the plungle, we got fun and games!");
     uprintln!(opt, Stderr, None, 3, "{:?}", opt);
 
-    let base_version = env!("CARGO_PKG_VERSION");
-    let git_available = env!("GIT_AVAILABLE") == "true";
-    if git_available {
-        let git_sha = env!("GIT_SHA");
-        let git_branch = env!("GIT_BRANCH");
-        eprintln!("{} ({}, {})", base_version, git_sha, git_branch);
-    } else {
-        eprintln!("{}", base_version.to_string());
-    }
-
     match &opt.command {
         Some(Commands::Parse { model, input, output }) => {
             // parse codeplug
