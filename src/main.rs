@@ -13,6 +13,7 @@ mod merge;
 mod filter;
 
 use clap::{Parser, Subcommand};
+use lazy_static::lazy_static;
 use std::path::PathBuf;
 use std::error::Error;
 use helpers::*;
@@ -20,8 +21,22 @@ use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use crate::Dest::{Stdout, Stderr};
 
+lazy_static! {
+    static ref VERSION: String = get_version_fancy();
+}
+
 #[derive(Debug, Parser)]
-#[clap(version, author, about = "Codeplug conversion tool")]
+#[command(version = VERSION.as_str())]
+#[command(author = "Akira Youngblood")]
+#[command(about = "Codeplug conversion tool for radio configuration")]
+#[command(help_template = "\
+{before-help}{name} {version}
+{author-with-newline}{about-with-newline}
+{usage-heading} {usage}
+
+{all-args}{after-help}
+")]
+
 struct Opt {
     /// Color output
     #[arg(short, long, default_value_t, value_enum, global=true)]
@@ -73,6 +88,17 @@ enum Commands {
         /// Input paths
         inputs: Vec<PathBuf>,
     },
+}
+
+pub fn get_version_fancy() -> String {
+    if env!("GIT_AVAILABLE") == "true" {
+        let base_version = env!("CARGO_PKG_VERSION");
+        let git_sha = env!("GIT_SHA");
+        let git_branch = env!("GIT_BRANCH");
+        format!("{} ({} {})", base_version, git_sha, git_branch)
+    } else {
+        format!("{}", env!("CARGO_PKG_VERSION"))
+    }
 }
 
 fn read_codeplug(opt: &Opt, input_path: &PathBuf) -> Result<structures::Codeplug, Box<dyn Error>> {
@@ -157,6 +183,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     // all output except the actual codeplug data should go to stderr
     uprintln!(opt, Stderr, Color::Green, 1, "Welcome to the plungle, we got fun and games!");
     uprintln!(opt, Stderr, None, 3, "{:?}", opt);
+
+    let base_version = env!("CARGO_PKG_VERSION");
+    let git_available = env!("GIT_AVAILABLE") == "true";
+    if git_available {
+        let git_sha = env!("GIT_SHA");
+        let git_branch = env!("GIT_BRANCH");
+        eprintln!("{} ({}, {})", base_version, git_sha, git_branch);
+    } else {
+        eprintln!("{}", base_version.to_string());
+    }
 
     match &opt.command {
         Some(Commands::Parse { model, input, output }) => {
