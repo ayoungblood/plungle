@@ -17,9 +17,10 @@ use clap::{Parser, Subcommand};
 use lazy_static::lazy_static;
 use std::path::PathBuf;
 use std::error::Error;
-use helpers::*;
 use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+
+use helpers::*;
 use crate::Dest::{Stdout, Stderr};
 use crate::theme::THEME;
 
