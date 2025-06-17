@@ -76,7 +76,7 @@ fn pretty_channel(_opt: &Opt, channel: &Channel) -> String {
     // print common stuff
     line.push_str(&format!("CHAN "));
     line.push_str(&format!("{:4} ", channel.index));
-    line.push_str(&format!("{:16} ", channel.name));
+    line.push_str(&format!("{:18} ", channel.name));
     line.push_str(&format!("{:4} ", format!("{:?}", channel.mode)));
     line.push_str(&format!("{:12} ", channel.frequency_rx.to_pretty_str_fixed()));
     line.push_str(&format!("{:12} ", channel.frequency_tx.to_pretty_str_fixed()));
@@ -136,7 +136,7 @@ fn print_channels(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Erro
 
     let mut output = String::new();
     output.push_str(&format!(
-        "\nCHAN:{:4} {:16} {:4} {:12} {:12} {:3} {:4} {:5} {:7} {:16}\n",
+        "\nCHAN:{:4} {:18} {:4} {:12} {:12} {:3} {:4} {:5} {:7} {:16}\n",
         "idx", "name", "mode", "rxf", "txf", "rxo", "tot", "power", "txprmit", "scan"
     ));
     for channel in &codeplug.channels {
