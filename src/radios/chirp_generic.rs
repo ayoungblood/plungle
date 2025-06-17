@@ -195,13 +195,13 @@ pub fn parse_channel_record(opt: &Opt, record: &CsvRecord) -> Result<Channel, Bo
             tone_tx: tone_tx,
         });
     } else {
-        uprintln!(opt, Stderr, Color::Red, None, "Unsupported mode: {}", record.get("Mode").unwrap());
+        uprintln!(opt, Stderr, THEME.err, None, "Unsupported mode: {}", record.get("Mode").unwrap());
     }
     Ok(channel)
 }
 
 pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let mut codeplug = Codeplug::default();
@@ -209,7 +209,7 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 
     // check that the input path is a file
     if !input_path.is_file() {
-        uprintln!(opt, Stderr, Color::Red, None, "You lied to me when you told me this was a file: {}", input_path.display());
+        uprintln!(opt, Stderr, THEME.err, None, "You lied to me when you told me this was a file: {}", input_path.display());
         return Err("Bad input path".into());
     }
 
@@ -549,7 +549,7 @@ fn write_power(power: &Power) -> String {
 }
 
 fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &Path) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     // open the output file
@@ -615,7 +615,7 @@ fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &Path) -> Result<(), Box
                 "".to_string(), // DVCODE
             ])?;
         } else {
-            uprintln!(opt, Stderr, Color::Red, None, "Unsupported mode: index = {}, mode = {:?}", channel.index, channel.mode);
+            uprintln!(opt, Stderr, THEME.err, None, "Unsupported mode: index = {}, mode = {:?}", channel.index, channel.mode);
         }
     }
 
@@ -625,12 +625,12 @@ fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &Path) -> Result<(), Box
 
 
 pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     // if the output path exists, complain
     if output_path.exists() {
-        uprintln!(opt, Stderr, Color::Red, None, "Output path already exists: {}", output_path.display());
+        uprintln!(opt, Stderr, THEME.err, None, "Output path already exists: {}", output_path.display());
         return Err("Output path already exists".into());
     }
 

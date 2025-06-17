@@ -25,7 +25,7 @@ pub struct Complaint {
 
 // this function performs validation steps that are common across all radios
 pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &Bandplan) -> Result<Vec<Complaint>, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Validating codeplug against bandplan: {} (source: {})", bandplan.name, bandplan.source.as_ref().unwrap());
     let mut complaints: Vec<Complaint> = Vec::new();
     // validate the codeplug
@@ -151,7 +151,7 @@ pub fn validate_generic(opt: &Opt, codeplug: &structures::Codeplug, bandplan: &B
 }
 
 pub fn validate_specific(opt: &Opt, codeplug: &structures::Codeplug, props: &structures::RadioProperties) -> Result<Vec<Complaint>, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     let mut complaints: Vec<Complaint> = Vec::new();
     // check codeplug
     if codeplug.channels.len() > props.channels_max as usize {
@@ -204,7 +204,7 @@ pub fn validate_specific(opt: &Opt, codeplug: &structures::Codeplug, props: &str
 }
 
 pub fn validate_codeplug(opt: &Opt, codeplug: &Codeplug, model: Option<&String>) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     let mut complaints: Vec<Complaint> = Vec::new();
     // load a band plan
     let bandplan = bandplan::load_bandplan(opt)?;
@@ -225,7 +225,7 @@ pub fn validate_codeplug(opt: &Opt, codeplug: &Codeplug, model: Option<&String>)
 }
 
 pub fn print_complaints(opt: &Opt, complaints: &Vec<Complaint>) {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, Color::Magenta, None, "{:-^1$}", " Validation Output ", 79);
 
     // print the complaints
@@ -238,10 +238,10 @@ pub fn print_complaints(opt: &Opt, complaints: &Vec<Complaint>) {
         }
         match complaint.severity {
             Severity::Error => {
-                uprintln!(opt, Stderr, Color::Red, None, "[Error  ] {}", line);
+                uprintln!(opt, Stderr, THEME.err, None, "[Error  ] {}", line);
             },
             Severity::Warning => {
-                uprintln!(opt, Stderr, Color::Yellow, None, "[Warning] {}", line);
+                uprintln!(opt, Stderr, THEME.warn, None, "[Warning] {}", line);
             },
             Severity::Info => {
                 uprintln!(opt, Stderr, Color::Cyan, None, "[Info   ] {}", line);
@@ -254,9 +254,9 @@ pub fn print_complaints(opt: &Opt, complaints: &Vec<Complaint>) {
     let info_count = complaints.iter().filter(|c| c.severity == Severity::Info).count();
     uprintln!(opt, Stderr, Color::Magenta, None, "{}", "- ".repeat(40));
     if error_count > 0 {
-        uprintln!(opt, Stderr, Color::Red, None, "Validation: {} errors, {} warnings, {} infos", error_count, warning_count, info_count);
+        uprintln!(opt, Stderr, THEME.err, None, "Validation: {} errors, {} warnings, {} infos", error_count, warning_count, info_count);
     } else if warning_count > 0 {
-        uprintln!(opt, Stderr, Color::Yellow, None, "Validation: {} errors, {} warnings, {} infos", error_count, warning_count, info_count);
+        uprintln!(opt, Stderr, THEME.warn, None, "Validation: {} errors, {} warnings, {} infos", error_count, warning_count, info_count);
     } else {
         uprintln!(opt, Stderr, Color::Cyan, None, "Validation: {} errors, {} warnings, {} infos", error_count, warning_count, info_count);
     }

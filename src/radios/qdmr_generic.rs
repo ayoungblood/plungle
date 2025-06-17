@@ -91,14 +91,14 @@ pub fn get_props() -> &'static structures::RadioProperties {
 // READ ///////////////////////////////////////////////////////////////////////
 
 pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let mut codeplug = Codeplug::default();
 
     // check that the input path is a file
     if !input_path.is_file() {
-        uprintln!(opt, Stderr, Color::Red, None, "You lied to me when you told me this was a file: {}", input_path.display());
+        uprintln!(opt, Stderr, THEME.err, None, "You lied to me when you told me this was a file: {}", input_path.display());
         return Err("Bad input path".into());
     }
 

@@ -169,7 +169,7 @@ fn parse_channel_record(opt: &Opt, record: &CsvRecord) -> Result<Channel, Box<dy
 }
 
 pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let mut codeplug = Codeplug::default();
@@ -177,7 +177,7 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 
     // check that the input path is a directory
     if !input_path.is_dir() {
-        uprintln!(opt, Stderr, Color::Red, None, "You lied to me when you told me this was a directory: {}", input_path.display());
+        uprintln!(opt, Stderr, THEME.err, None, "You lied to me when you told me this was a directory: {}", input_path.display());
         return Err("Bad input path".into());
     }
 
@@ -205,8 +205,8 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 // WRITE //////////////////////////////////////////////////////////////////////
 
 pub fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
-    uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
     .from_path(path)?;
@@ -263,7 +263,7 @@ pub fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<
 }
 
 pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     // if the output path exists, check if it is an empty directory
@@ -273,7 +273,7 @@ pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<()
             // check if the directory is empty
             let dir_entries = std::fs::read_dir(output_path)?;
             if dir_entries.count() > 0 {
-                uprintln!(opt, Stderr, Color::Red, None, "Output path exists and is not empty, not overwriting!");
+                uprintln!(opt, Stderr, THEME.err, None, "Output path exists and is not empty, not overwriting!");
                 return Err("Bad output path".into());
             }
         }
@@ -282,7 +282,7 @@ pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<()
         std::fs::create_dir_all(output_path)?;
     }
     if fs::metadata(output_path)?.permissions().readonly() {
-        uprintln!(opt, Stderr, Color::Red, None, "Output path is read-only, cannot write!");
+        uprintln!(opt, Stderr, THEME.err, None, "Output path is read-only, cannot write!");
         return Err("Bad output path".into());
     }
 

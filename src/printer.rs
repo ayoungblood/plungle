@@ -132,7 +132,7 @@ fn pretty_channel(_opt: &Opt, channel: &Channel) -> String {
 }
 
 fn print_channels(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
     output.push_str(&format!(
@@ -148,7 +148,7 @@ fn print_channels(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Erro
 }
 
 fn print_zones(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
     output.push_str(&format!(
@@ -173,7 +173,7 @@ fn print_zones(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>>
 }
 
 fn print_scanlists(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
     output.push_str(&format!(
@@ -198,7 +198,7 @@ fn print_scanlists(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Err
 }
 
 fn print_talkgroups(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
     output.push_str(&format!(
@@ -223,7 +223,7 @@ fn print_talkgroups(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Er
 }
 
 fn print_talkgroup_lists(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
     output.push_str(&format!(
@@ -248,7 +248,7 @@ fn print_talkgroup_lists(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<d
 }
 
 fn print_config(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
     if let Some(config) = &codeplug.config {
@@ -271,7 +271,7 @@ fn print_config(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>
 }
 
 pub fn pretty(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
 
     let mut output = String::new();
 

@@ -288,7 +288,7 @@ fn parse_channel_record(opt: &Opt, record: &CsvRecord) -> Result<Channel, Box<dy
         });
         // warn if an RX tone is set but squelch mode is not CTCSS/DCS
         if record.get("Squelch Mode").unwrap() != "CTCSS/DCS" && channel.fm.as_ref().unwrap().tone_rx.is_some() {
-            uprintln!(opt, Stderr, Color::Yellow, None, "[Warning] {:4} {:24} {}",
+            uprintln!(opt, Stderr, THEME.warn, None, "[Warning] {:4} {:24} {}",
                 channel.index, channel.name, "RX tone set but squelch mode is not CTCSS/DCS");
             // null out the tone
             channel.fm.as_mut().unwrap().tone_rx = None;
@@ -374,7 +374,7 @@ fn parse_dmr_id_record(opt: &Opt, csv_dmr_id: &CsvRecord) -> Result<DmrId, Box<d
 }
 
 pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let mut codeplug: Codeplug = Codeplug::default();
@@ -382,7 +382,7 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 
     // check that the input path is a directory
     if !input_path.is_dir() {
-        uprintln!(opt, Stderr, Color::Red, None, "You lied to me when you told me this was a directory: {}", input_path.display());
+        uprintln!(opt, Stderr, THEME.err, None, "You lied to me when you told me this was a directory: {}", input_path.display());
         return Err("Bad input path".into());
     }
 
@@ -515,7 +515,7 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 // WRITE //////////////////////////////////////////////////////////////////////
 
 pub fn write_talkgroups(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
@@ -553,7 +553,7 @@ pub fn write_talkgroups(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Resul
 }
 
 pub fn write_talkgroup_lists(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
@@ -724,7 +724,7 @@ fn write_receive_group_list(channel: &Channel, _codeplug: &Codeplug) -> String {
 }
 
 pub fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
@@ -931,7 +931,7 @@ pub fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<
                 "0".to_string(), // ex_emg_kind
             ])?;
         } else {
-            uprintln!(opt, Stderr, Color::Red, None, "Unsupported channel mode: index = {}, mode = {:?}", channel.index, channel.mode);
+            uprintln!(opt, Stderr, THEME.err, None, "Unsupported channel mode: index = {}, mode = {:?}", channel.index, channel.mode);
         }
     }
 
@@ -941,7 +941,7 @@ pub fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<
 }
 
 pub fn write_zones(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
@@ -1006,7 +1006,7 @@ pub fn write_zones(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(),
 }
 
 pub fn write_scanlists(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
@@ -1081,7 +1081,7 @@ pub fn write_scanlists(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result
 }
 
 pub fn write_radio_id_list(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     let mut writer = csv::WriterBuilder::new()
@@ -1110,7 +1110,7 @@ pub fn write_radio_id_list(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Re
 }
 
 pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     // if the output path exists, check if it is an empty directory
@@ -1120,7 +1120,7 @@ pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<()
             // check if the directory is empty
             let dir_entries = std::fs::read_dir(output_path)?;
             if dir_entries.count() > 0 {
-                uprintln!(opt, Stderr, Color::Red, None, "Output path exists and is not empty, not overwriting!");
+                uprintln!(opt, Stderr, THEME.err, None, "Output path exists and is not empty, not overwriting!");
                 return Err("Bad output path".into());
             }
         }
@@ -1129,7 +1129,7 @@ pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<()
         std::fs::create_dir_all(output_path)?;
     }
     if fs::metadata(output_path)?.permissions().readonly() {
-        uprintln!(opt, Stderr, Color::Red, None, "Output path is read-only, cannot write!");
+        uprintln!(opt, Stderr, THEME.err, None, "Output path is read-only, cannot write!");
         return Err("Bad output path".into());
     }
 

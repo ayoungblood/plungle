@@ -3,7 +3,7 @@
 use crate::*;
 
 fn merge_all(opt: &Opt, input_codeplug: &structures::Codeplug, target_codeplug: &mut structures::Codeplug) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     // merge channels
     // find the highest channel index in the target codeplug
     let mut max_channel_index: usize = 0;
@@ -15,7 +15,7 @@ fn merge_all(opt: &Opt, input_codeplug: &structures::Codeplug, target_codeplug: 
     for channel in &input_codeplug.channels {
         // check if a channel with the same name already exists in the target codeplug
         if let Some(_) = target_codeplug.channels.iter_mut().rev().find(|c| c.name == channel.name) {
-            uprintln!(opt, Stderr, Color::Yellow, None, "Channel already exists in codeplug, skipping: {:4} {}",
+            uprintln!(opt, Stderr, THEME.warn, None, "Channel already exists in codeplug, skipping: {:4} {}",
                 channel.index, channel.name);
         } else {
             let mut new_channel = channel.clone();
@@ -36,7 +36,7 @@ fn merge_all(opt: &Opt, input_codeplug: &structures::Codeplug, target_codeplug: 
     for zone in &input_codeplug.zones {
         // check if a zone with the same name already exists in the target codeplug
         if let Some(_) = target_codeplug.zones.iter_mut().find(|z| z.name == zone.name) {
-            uprintln!(opt, Stderr, Color::Yellow, None, "Zone already exists in codeplug, skipping: {:4} {}",
+            uprintln!(opt, Stderr, THEME.warn, None, "Zone already exists in codeplug, skipping: {:4} {}",
                 zone.index, zone.name);
         } else {
             let mut new_zone = zone.clone();
@@ -57,7 +57,7 @@ fn merge_all(opt: &Opt, input_codeplug: &structures::Codeplug, target_codeplug: 
     for talkgroup in &input_codeplug.talkgroups {
         // check if a talkgroup with the same name already exists in the target codeplug
         if let Some(_) = target_codeplug.talkgroups.iter_mut().find(|t| t.name == talkgroup.name) {
-            uprintln!(opt, Stderr, Color::Yellow, None, "Talkgroup already exists in codeplug, skipping: {:4} {}",
+            uprintln!(opt, Stderr, THEME.warn, None, "Talkgroup already exists in codeplug, skipping: {:4} {}",
                 talkgroup.index, talkgroup.name);
         } else {
             let mut new_talkgroup = talkgroup.clone();
@@ -78,7 +78,7 @@ fn merge_all(opt: &Opt, input_codeplug: &structures::Codeplug, target_codeplug: 
     for talkgroup_list in &input_codeplug.talkgroup_lists {
         // check if a talkgroup list with the same name already exists in the target codeplug
         if let Some(_) = target_codeplug.talkgroup_lists.iter_mut().find(|tl| tl.name == talkgroup_list.name) {
-            uprintln!(opt, Stderr, Color::Yellow, None, "Talkgroup list already exists in codeplug, skipping: {:4} {}",
+            uprintln!(opt, Stderr, THEME.warn, None, "Talkgroup list already exists in codeplug, skipping: {:4} {}",
                 talkgroup_list.index, talkgroup_list.name);
         } else {
             let mut new_talkgroup_list = talkgroup_list.clone();
@@ -92,7 +92,7 @@ fn merge_all(opt: &Opt, input_codeplug: &structures::Codeplug, target_codeplug: 
 }
 
 pub fn merge_codeplug(opt: &Opt, inputs: &[PathBuf]) -> Result<structures::Codeplug, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     let mut codeplug: structures::Codeplug = structures::Codeplug::default();
     // iterate through the inputs
     for input in inputs {
