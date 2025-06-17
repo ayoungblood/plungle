@@ -26,7 +26,7 @@ pub struct Bandplan {
 
 // load a bandplan from a file
 pub fn load_bandplan(opt: &Opt) -> Result<Bandplan, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     let json_path = PathBuf::from("bandplan.json");
     if json_path.exists() {
         // first look for bandplan.json in the current directory

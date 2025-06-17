@@ -52,7 +52,7 @@ fn get_talkgroup_list_by_index(codeplug: &structures::Codeplug, index: usize) ->
 }
 
 fn filter_channels(opt: &Opt, source_codeplug: &structures::Codeplug, dest_codeplug: &mut structures::Codeplug, part: &String) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}(): part=\"{}\"", file!(), function!(), part);
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}(): part=\"{}\"", file!(), function!(), part);
     // remove the prefix (split on ':' and discard the first part), then split on semicolons
     let mut criteria = part.split(':').nth(1).unwrap().split(';');
     // get the first criterion, this is basis for future filtering
@@ -97,7 +97,7 @@ fn filter_channels(opt: &Opt, source_codeplug: &structures::Codeplug, dest_codep
 }
 
 fn filter_zones(opt: &Opt, source_codeplug: &structures::Codeplug, dest_codeplug: &mut structures::Codeplug, part: &String) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}(): part=\"{}\"", file!(), function!(), part);
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}(): part=\"{}\"", file!(), function!(), part);
     // remove the prefix (split on ':' and discard the first part), then split on semicolons
     let mut criteria = part.split(':').nth(1).unwrap().split(';');
     // get the first criterion, this is basis for future filtering
@@ -158,7 +158,7 @@ fn filter_zones(opt: &Opt, source_codeplug: &structures::Codeplug, dest_codeplug
 }
 
 fn filter_talkgroups(opt: &Opt, source_codeplug: &structures::Codeplug, dest_codeplug: &mut structures::Codeplug, part: &String) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}(): part=\"{}\"", file!(), function!(), part);
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}(): part=\"{}\"", file!(), function!(), part);
     // remove the prefix (split on ':' and discard the first part), then split on semicolons
     let mut criteria = part.split(':').nth(1).unwrap().split(';');
     // get the first criterion, this is basis for future filtering
@@ -223,7 +223,7 @@ fn filter_talkgroups(opt: &Opt, source_codeplug: &structures::Codeplug, dest_cod
 }
 
 fn filter_talkgroup_lists(opt: &Opt, source_codeplug: &structures::Codeplug, dest_codeplug: &mut structures::Codeplug, part: &String) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}(): part=\"{}\"", file!(), function!(), part);
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}(): part=\"{}\"", file!(), function!(), part);
     // remove the prefix (split on ':' and discard the first part), then split on semicolons
     let mut criteria = part.split(':').nth(1).unwrap().split(';');
     // get the first criterion, this is basis for future filtering
@@ -297,7 +297,7 @@ fn filter_talkgroup_lists(opt: &Opt, source_codeplug: &structures::Codeplug, des
 }
 
 pub fn filter_codeplug(opt: &Opt, codeplug: &structures::Codeplug, filter_strings: &Option<Vec<String>>) -> Result<structures::Codeplug, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     match filter_strings {
         Some(filters) => {
             uprintln!(opt, Stderr, Color::Cyan, None, "--filter: {:4} channels, {:3} zones, {:3} talkgroups, {:3} talkgroup lists before filtering",
@@ -320,7 +320,7 @@ pub fn filter_codeplug(opt: &Opt, codeplug: &structures::Codeplug, filter_string
                     } else if part.starts_with("tgl:") {
                         filter_talkgroup_lists(opt, codeplug, &mut filtered_codeplug, &part.to_string())?;
                     } else {
-                        uprintln!(opt, Stderr, Color::Red, None, "--filter: Invalid filter part: \"{}\"", part);
+                        uprintln!(opt, Stderr, THEME.err, None, "--filter: Invalid filter part: \"{}\"", part);
                     }
                 }
             }

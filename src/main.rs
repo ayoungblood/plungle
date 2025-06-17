@@ -11,6 +11,7 @@ mod bandplan;
 mod printer;
 mod merge;
 mod filter;
+mod theme;
 
 use clap::{Parser, Subcommand};
 use lazy_static::lazy_static;
@@ -20,6 +21,7 @@ use helpers::*;
 use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use crate::Dest::{Stdout, Stderr};
+use crate::theme::THEME;
 
 lazy_static! {
     static ref VERSION: String = get_version_fancy();
@@ -102,7 +104,7 @@ pub fn get_version_fancy() -> String {
 }
 
 fn read_codeplug(opt: &Opt, input_path: &PathBuf) -> Result<structures::Codeplug, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     // if we recognize the file extension, use it to determine the file format
     // otherwise, use --format (which defaults to JSON)
     let format = match input_path.extension() {
@@ -118,13 +120,13 @@ fn read_codeplug(opt: &Opt, input_path: &PathBuf) -> Result<structures::Codeplug
     // read the codeplug
     let codeplug: structures::Codeplug;
     if format == helpers::Format::Json {
-        if !opt.quiet { uprintln!(opt, Stderr, Color::Green, None, "Reading codeplug as JSON from: {:?}", input_path); }
+        if !opt.quiet { uprintln!(opt, Stderr, THEME.info, None, "Reading codeplug as JSON from: {:?}", input_path); }
         codeplug = serde_json::from_str(&std::fs::read_to_string(input_path)?)?;
     } else if format == helpers::Format::Toml {
-        if !opt.quiet { uprintln!(opt, Stderr, Color::Green, None, "Reading codeplug as TOML from: {:?}", input_path); }
+        if !opt.quiet { uprintln!(opt, Stderr, THEME.info, None, "Reading codeplug as TOML from: {:?}", input_path); }
         codeplug = toml::from_str(&std::fs::read_to_string(input_path)?)?;
     } else {
-        uprintln!(opt, Stderr, Color::Red, None, "Unsupported codeplug format");
+        uprintln!(opt, Stderr, THEME.err, None, "Unsupported codeplug format");
         return Err("Unsupported codeplug format".into());
     }
 
@@ -132,7 +134,7 @@ fn read_codeplug(opt: &Opt, input_path: &PathBuf) -> Result<structures::Codeplug
 }
 
 fn write_codeplug(opt: &Opt, output_path: &Option<PathBuf>, codeplug: &structures::Codeplug) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     // if --format is Default, and we recognize the file extension, use it to determine the file format
     // otherwise, use --format
     let format = match opt.format {
@@ -166,10 +168,10 @@ fn write_codeplug(opt: &Opt, output_path: &Option<PathBuf>, codeplug: &structure
 
     // write to file or stdout
     if output_path.is_none() {
-        if !opt.quiet { uprintln!(opt, Stderr, Color::Green, None, "Writing codeplug to stdout (--format={})", format); }
+        if !opt.quiet { uprintln!(opt, Stderr, THEME.info, None, "Writing codeplug to stdout (--format={})", format); }
         uprintln!(opt, Stdout, None, None, "{}", file_str);
     } else {
-        if !opt.quiet { uprintln!(opt, Stderr, Color::Green, None, "Writing codeplug to {:?} (--format={})", output_path.as_ref().unwrap(), format); }
+        if !opt.quiet { uprintln!(opt, Stderr, THEME.info, None, "Writing codeplug to {:?} (--format={})", output_path.as_ref().unwrap(), format); }
         std::fs::write(output_path.as_ref().unwrap(), file_str)?;
     }
 
@@ -181,7 +183,7 @@ fn write_codeplug(opt: &Opt, output_path: &Option<PathBuf>, codeplug: &structure
 fn main() -> Result<(), Box<dyn Error>> {
     let opt: Opt = Opt::parse();
     // all output except the actual codeplug data should go to stderr
-    uprintln!(opt, Stderr, Color::Green, 1, "Welcome to the plungle, we got fun and games!");
+    uprintln!(opt, Stderr, THEME.info, 1, "Welcome to the plungle, we got fun and games!");
     uprintln!(opt, Stderr, None, 3, "{:?}", opt);
 
     match &opt.command {
@@ -216,7 +218,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             write_codeplug(&opt, &None, &codeplug)?; // @TODO FIXME
         }
         None => { // this should never happen because of arg_required_else_help
-            uprintln!(opt, Stderr, Color::Red, None, "No command specified");
+            uprintln!(opt, Stderr, THEME.err, None, "No command specified");
         }
     }
     Ok(())

@@ -203,7 +203,7 @@ fn parse_channel_record(opt: &Opt, record: &CsvRecord, codeplug: &Codeplug) -> R
 }
 
 pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let mut codeplug = Codeplug::default();
@@ -211,7 +211,7 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 
     // check that the input path is a directory
     if !input_path.is_dir() {
-        uprintln!(opt, Stderr, Color::Red, None, "You lied to me when you told me this was a directory: {}", input_path.display());
+        uprintln!(opt, Stderr, THEME.err, None, "You lied to me when you told me this was a directory: {}", input_path.display());
         return Err("Bad input path".into());
     }
 
@@ -253,7 +253,7 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
     if let Some(entry) = channels_file {
         channels_path.push(entry.file_name());
     } else {
-        uprintln!(opt, Stderr, Color::Red, None, "No channels.csv file found in the directory: {}", input_path.display());
+        uprintln!(opt, Stderr, THEME.err, None, "No channels.csv file found in the directory: {}", input_path.display());
         return Err("Channels file not found".into());
     }
     uprintln!(opt, Stderr, None, 3, "Reading {}", channels_path.display());
@@ -272,7 +272,7 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 // WRITE //////////////////////////////////////////////////////////////////////
 
 fn write_talkgroups(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     // write contacts.csv
@@ -366,7 +366,7 @@ fn write_power(power: &Power) -> String {
 }
 
 fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     // write channels.csv
@@ -551,7 +551,7 @@ fn write_channels(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Result<(), 
 }
 
 pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     // if the output path exists, check if it is an empty directory
@@ -561,7 +561,7 @@ pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<()
             // check if the directory is empty
             let dir_entries = std::fs::read_dir(output_path)?;
             if dir_entries.count() > 0 {
-                uprintln!(opt, Stderr, Color::Red, None, "Output path exists and is not empty, not overwriting!");
+                uprintln!(opt, Stderr, THEME.err, None, "Output path exists and is not empty, not overwriting!");
                 return Err("Bad output path".into());
             }
         }
@@ -570,7 +570,7 @@ pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<()
         std::fs::create_dir_all(output_path)?;
     }
     if fs::metadata(output_path)?.permissions().readonly() {
-        uprintln!(opt, Stderr, Color::Red, None, "Output path is read-only, cannot write!");
+        uprintln!(opt, Stderr, THEME.err, None, "Output path is read-only, cannot write!");
         return Err("Bad output path".into());
     }
 
