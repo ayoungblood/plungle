@@ -1,0 +1,471 @@
+---
+version: 0.11.2
+settings:
+  introLine1: ""
+  introLine2: ""
+  micLevel: 3
+  speech: false
+  power: Mid
+  squelch: 3
+  vox: 0
+  tot: 60
+  defaultID: id1
+radioIDs:
+  - dmr: {id: id1, name: CALLSIGN, number: 0}
+contacts:
+  - dmr: {id: cont1, name: Group 11, ring: false, type: GroupCall, number: 11}
+  - dmr: {id: cont2, name: Private 22, ring: false, type: PrivateCall, number: 22}
+  - dmr: {id: cont3, name: ALL CALL, ring: false, type: AllCall, number: 16777215}
+  - dmr: {id: cont4, name: Private 33 Ring, ring: true, type: PrivateCall, number: 0}
+  - dmr: {id: cont5, name: VERYLONGGROUPNAMESOLONGHOLYCOW, ring: false, type: GroupCall, number: 777}
+groupLists:
+  - {id: grp1, name: GroupList A, contacts: [cont1, cont3]}
+channels:
+  - analog:
+      id: ch1
+      name: Analog Default
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch2
+      name: A Pwr Max
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: Max
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch3
+      name: A Pwr High
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: High
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch4
+      name: A Pwr Mid
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: Mid
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch5
+      name: A Pwr Low
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: Low
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch6
+      name: A Pwr Min
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: Min
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch7
+      name: TXTOT Off
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: 0
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch8
+      name: TXTOT 1s
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: 1
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch9
+      name: TXTOT 60s
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: 60
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch10
+      name: TXTOT 999s
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: 999
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch11
+      name: VOX Off
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: 0
+      squelch: !<!default> ""
+  - analog:
+      id: ch12
+      name: VOX 1
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: 1
+      squelch: !<!default> ""
+  - analog:
+      id: ch13
+      name: VOX 10
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: 10
+      squelch: !<!default> ""
+  - analog:
+      id: ch14
+      name: Rx Only
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: true
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch15
+      name: Scan List A
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      scanListRef: scan1
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch16
+      name: Tx Admit CFree
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Free
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch17
+      name: Tx Admit Tone
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Tone
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - analog:
+      id: ch18
+      name: Squelch Open
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: 0
+  - analog:
+      id: ch19
+      name: Squelch 1
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: 1
+  - analog:
+      id: ch20
+      name: Squelch 10
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: 10
+  - analog:
+      id: ch21
+      name: CTCSS 67
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      rxTone: {ctcss: 67}
+      squelch: !<!default> ""
+  - analog:
+      id: ch22
+      name: CTCSS 250.3
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      rxTone: {ctcss: 250.300003}
+      squelch: !<!default> ""
+  - analog:
+      id: ch23
+      name: DCS 23N
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      rxTone: {dcs: 23}
+      squelch: !<!default> ""
+  - analog:
+      id: ch24
+      name: DCS 754I
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      rxTone: {dcs: -754}
+      squelch: !<!default> ""
+  - analog:
+      id: ch25
+      name: Bandwidth 12K5
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      bandwidth: Narrow
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
+  - digital:
+      id: ch26
+      name: Digital Default
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      colorCode: 1
+      timeSlot: TS1
+      radioId: !<!default> ""
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+  - digital:
+      id: ch27
+      name: DMR ID CALLSIGN
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Always
+      colorCode: 1
+      timeSlot: TS1
+      radioId: id1
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+  - digital:
+      id: ch28
+      name: D Tx Admit CFree
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: Free
+      colorCode: 1
+      timeSlot: TS1
+      radioId: !<!default> ""
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+  - digital:
+      id: ch29
+      name: D Tx Admit CC
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: ColorCode
+      colorCode: 1
+      timeSlot: TS1
+      radioId: !<!default> ""
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+  - digital:
+      id: ch30
+      name: D CC0
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: ColorCode
+      colorCode: 0
+      timeSlot: TS1
+      radioId: !<!default> ""
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+  - digital:
+      id: ch31
+      name: D CC15
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: ColorCode
+      colorCode: 15
+      timeSlot: TS1
+      radioId: !<!default> ""
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+  - digital:
+      id: ch32
+      name: D TS 2
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: ColorCode
+      colorCode: 1
+      timeSlot: TS2
+      radioId: !<!default> ""
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+  - digital:
+      id: ch33
+      name: Rx GroupList A
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: ColorCode
+      colorCode: 1
+      timeSlot: TS1
+      radioId: !<!default> ""
+      groupList: grp1
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+  - digital:
+      id: ch34
+      name: Tx Contact Group 11
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: ColorCode
+      colorCode: 1
+      timeSlot: TS1
+      radioId: !<!default> ""
+      contact: cont1
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+  - digital:
+      id: ch35
+      name: Roaming Zone Default
+      rxFrequency: 446
+      txFrequency: 446
+      rxOnly: false
+      admit: ColorCode
+      colorCode: 1
+      timeSlot: TS1
+      radioId: !<!default> ""
+      roaming: !<!default> ""
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+zones:
+  []
+scanLists:
+  - id: scan1
+    name: Scan List A
+    channels: [ch2, ch3, ch4, ch5, ch6]
+commercial:
+  encryptionKeys:
+    []
+...
