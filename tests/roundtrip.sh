@@ -28,11 +28,11 @@ $target parse -q alinco_djmd5t $tempdir/djmd5t/ $tempdir/djmd5t.json
 # Generate RT3S codeplug from djmd5t.json
 $target generate -q opengd77_rt3s $tempdir/djmd5t.json $tempdir/opengd77_rt3s/
 # Compare generated codeplug with original, file by file
-printf "[compare.sh] Comparing files, ignoring line endings\n"
+printf "[roundtrip.sh] Comparing files, ignoring line endings\n"
 for file in $(ls $tempdir/opengd77_rt3s); do
-    printf "[compare.sh] Comparing $file\n"
+    printf "[roundtrip.sh] Comparing $file\n"
     diff --strip-trailing-cr $tempdir/opengd77_rt3s/$file ../fixtures/opengd77_rt3s/basic/$file
-    printf "[compare.sh]     diff returned $?\n"
+    printf "[roundtrip.sh]     diff returned $?\n"
 done
 # debug
 # meld ../fixtures/opengd77_rt3s/basic/ $tempdir/opengd77_rt3s/
@@ -48,12 +48,28 @@ $target parse -q alinco_djmd5t $tempdir/djmd5t/ $tempdir/djmd5t.json
 # Generate D878UV codeplug from djmd5t.json
 $target generate -q anytone_x78 $tempdir/djmd5t.json $tempdir/anytone_d878uv/
 # Compare generated codeplug with original, file by file
-printf "[compare.sh] Comparing files, ignoring line endings\n"
+printf "[roundtrip.sh] Comparing files, ignoring line endings\n"
 for file in $(ls $tempdir/anytone_d878uv); do
-    printf "[compare.sh] Comparing $file\n"
+    printf "[roundtrip.sh] Comparing $file\n"
     diff --strip-trailing-cr $tempdir/anytone_d878uv/$file ../fixtures/anytone_d878uv/basic/$file
-    printf "[compare.sh]     diff returned $?\n"
+    printf "[roundtrip.sh]     diff returned $?\n"
 done
 # debug
 # meld ../fixtures/anytone_d878uv/basic/ $tempdir/anytone_d878uv/
 # meld $tempdir/anytone_d878uv.json $tempdir/djmd5t.json
+
+rm -rf $tempdir/*
+printf "\n\x1b[4;36m[roundtrip.sh] RMHAM LARGE Anytone D878UV > Anytone D878UV\x1b[0m\n"
+# Parse RMHAM Anytone fixture
+$target parse -q anytone_x78 ../fixtures/anytone_d878uv/rmham_anytone_2024-11-27/Export/ $tempdir/rmham_anytone.json
+# Generate Anytone D878UV codeplug from rmham_anytone.json
+$target generate -q anytone_x78 $tempdir/rmham_anytone.json $tempdir/rmham_anytone/
+# Compare generated codeplug with original, file by file
+printf "[roundtrip.sh] Comparing files, ignoring line endings\n"
+for file in $(ls $tempdir/rmham_anytone); do
+    printf "[roundtrip.sh] Comparing $file\n"
+    diff --strip-trailing-cr $tempdir/rmham_anytone/$file ../fixtures/anytone_d878uv/rmham_anytone_2024-11-27/Export/$file
+    printf "[roundtrip.sh]     diff returned $?\n"
+done
+# debug
+# meld ../fixtures/anytone_d878uv/rmham_anytone_2024-11-27/Export/ $tempdir/rmham_anytone/
