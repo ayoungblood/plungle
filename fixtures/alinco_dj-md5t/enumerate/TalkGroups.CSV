@@ -1,0 +1,6 @@
+"No.","Radio ID","Name","Call Type","Call Alert"
+"1","55","Group Call 55","Group Call","None"
+"2","99","Private Call 99","Private Call","None"
+"3","16777215","ALL CALL","All Call","None"
+"4","66","CallAlert Ring","Private Call","Ring"
+"5","77","CallAlert Online","Private Call","Online Alert"
