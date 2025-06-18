@@ -94,32 +94,47 @@ Complete documentation is not yet written.
 
 ### 4.1 Supported Radios
 
-* Anytone D878UV (other Dx78 radios are untested but may work)
-* Retevis RT3S running OpenGD77 (any other OpenGD77 radio should be supported, but has not been tested)
-* Alinco DJ-MD5TGP (other DJ-MD5x radios are untested but may work)
-* Ailunce HD1 (support is very poor due to limitations of the HD1 CPS)
-* TYT MD-UV390 (support is very poor due to limitations of the MD-UV390 CPS)
-* Generic [CHIRP](https://chirpmyradio.com/projects/chirp/wiki/Home) support
+plungle supports different radios (or, more accurately, different codeplug or CPS export formats) by using different "drivers" that convert to/from the vendor-specific format to a common data structure used by plungle. This data structure is easily serialized to JSON for storage, and plungle does its best to convert to other vendor-specific formats.
 
-## 5. Future Plans
+Support for different formats is managed by different drivers specific to radio models or software. For more information, see the linked documentation for each model.
 
-Future features that may eventually be added include:
+| model | supported radios | status | notes |
+|-------|------------------|--------|-------|
+| [ailunce_hd1](docs/radios/ailunce_hd1.md) | Ailunce HD1 | 🟧 | very limited to CPS limitations |
+| [alinco_djmd5t](docs/radios/alinco_djmd5t.md) | Alinco DJ-MD5T<br>Alinco DJ-MD5TGP | 🟩 | tested with DJ-MD5TGP<br>may work with other similar Alinco radios |
+| [anytone_x78](docs/radios/anytone_x78.md) | Anytone D878UV<br>??? | 🟩 | tested with D878UV Plus modded for APRS<br>may work with similar Anytone radios |
+| [chirp_generic](docs/radios/chirp_generic.md) | see [CHIRP](https://chirpmyradio.com/projects/chirp/wiki/Home#Supported-Radio-Models) | 🟨 | currently untested<br>should work with any FM radios supported by CHIRP |
+| [opengd77_rt3s](docs/radios/opengd77_rt3s.md) | Retevis RT3S w/ [OpenGD77](https://www.opengd77.com/) | 🟩 | tested with RT3S on OpenGD77 20240908..<br>may work on other radios supported by OpenGD77 but needs additional testing |
+| [tyt_mduv390](docs/radios/tyt_mduv390.md) | TYT MD-UV390 | 🟧 | very limited to due CPS limitations<br>may be removed as [qdmr](https://dm3mat.darc.de/qdmr/) support is planned |
 
-* CSV as an intermediary data format
-* [qdmr](https://github.com/hmatuschek/qdmr)-compatible import/export
-* Filtering codeplugs
-* Batch editing operations
-* Support for Motorola XPR 7550/e (VHF/UHF)
-* Support for Motorola XPR 6550 (VHF/UHF)
-* Support for Retevis RT3S on stock firmware, and TYT MD-UV380/MD-UV390 on OpenGD77 firmware
-* Support for Yaesu FT-3D
-* Support for the excellent [CPEditor by David MM7DBT](https://www.cpeditor.co.uk/), which supports:
+
+## 5. Roadmap
+
+### 5.1 Planned
+
+Planned features/support:
+
+* Support for [qdmr](https://dm3mat.darc.de/qdmr/), which supports numerous radios from Radioddity, TYT, Retevis, Anytone, and Baofeng
+* Filtering/merging of codeplugs
+* Support for Motorola XPR7550/XPR7550e
+* Support for [CPEditor by David MM7DBT](https://www.cpeditor.co.uk/), which supports:
     - Kydera CDR-300UV
     - Retevis RT73
     - Radioddity DB25-D
     - Radioddity DB40-D
-    - Radioddity GD-88
+    - Radioddity GD-8
 * Improved support for scanlists
+
+### 5.2 Possible
+
+Future features that may eventually be added include:
+
+* Batch editing operations
+* Support for Motorola XPR6550
+* Support for Yaesu FT-3D
+* TUI for editing codeplugs
+
+If there is a radio or editor that you would like to see supported, please let me know.
 
 ## 6. Contributing
 

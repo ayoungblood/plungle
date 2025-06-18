@@ -1,14 +1,17 @@
-# Supported Radios
+# [docs](index.md)/radios
+
+For an overview of current support, see the [README](../README.md). For model-specific information, see the list below:
+
+* [ailunce_hd1](radios/ailunce_hd1.md)
+* [alinco_djmd5t](radios/alinco_djmd5t.md)
+* [anytone_x78](radios/anytone_x78.md)
+* [chirp_generic](radios/chirp_generic.md)
+* [opengd77_rt3s](radios/opengd77_rt3s.md)
+* [tyt_mduv390](radios/tyt_mduv390.md)
 
 ## Properties
 
-| Radio | Channels | Zones | Scanlists | Talkgroups | Channel name | Channels/zone | Channels/scanlist | Talkgroup lists | Talkgroups/talkgroup lists | Zone name |
-|:------|---------:|------:|----------:|-----------:|-------------:|--------------:|------------------:|----------------:| --------------------------:|----------:|
-| Ailunce HD1 | 3000 |
-| Alinco DJ-MD5TGP | 4000 | 250 | 250 | 10,000 | 16 | 250 | 250 |
-| Anytone AT-D878UVII | 4000 |
-| Retevis RT3S | 3000 |
-| Retevis RT3S (OpenGD77) | 1024 | 68 | - | 1024 | 16 | 80 | - | 76 | 32 | 16 |
+@TODO move out
 
 ### Ailunce HD1
 
@@ -25,26 +28,6 @@ Based on V3.03 CPS
 * Max talkgroup name length: 16 (confirmed in CPS)
 * Max talkgroup lists: 255 (confirmed in CPS)
 * Max talkgroups per talkgroup list: 33
-
-### Alinco DJ-MD5TGP
-
-* TX Frequencies: 136 - 174 MHz, 400 - 480 MHz
-* Supported modes: FM, NFM, DMR
-* Max channels: 4000
-* Max channel name length: 16
-* Max zones: 250
-* Max zone name length: 16
-* Max channels per zone: 250
-* Max scanlists: 250
-* Max scanlist name length: 16
-* Max channels per scanlist: ??
-* Max talkgroups: 10000
-* Max talkgroup name length: 16
-* Max talkgroup lists: 250
-* Max talkgroups per talkgroup list: ??
-
-* Max DMR IDs: 250
-* Max DMR ID name length: 16
 
 ### Anytone AT-D878UVII
 
