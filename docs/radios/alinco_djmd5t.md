@@ -1,8 +1,29 @@
-# docs/radios/alinco_djmd5t
+# docs/[radios](../radios.md)/alinco_djmd5t
 
-`alinco_djmd5t` allows you to parse and generate CSV exports from the Alinco CPS.
+`alinco_djmd5t` allows you to parse and generate CSV exports from the Alinco DJ_MD5 CPS.
 
-This driver was targeted and tested on a DJ-MD5TGP. The CPS, firmware, drivers, and manuals are [here](https://www.remtronix.com/digital-radio/discontinued/dj-md5tgp/)
+This driver was targeted and tested on a DJ-MD5TGP running the v1.13e firmware and using the v1.13e CPS. The CPS, firmware, drivers, and manuals are [here](https://www.remtronix.com/digital-radio/discontinued/dj-md5tgp/). It should work with a DJ-MD5T, as the only difference appears to be GPS and digital APRS on the TGP variant.
+
+## Properties/Specifications
+
+Based on v1.13e CPS and [specifications](https://www.alinco.com/Products/dmr/DJ-MD5/DJ-MD5.pdf)
+
+* TX Frequencies: 136 - 174 MHz, 400 - 480 MHz
+* Supported modes: FM, NFM, DMR
+* Max channels: 4000
+* Max channel name length: 16
+* Max zones: 250
+* Max zone name length: 16
+* Max channels per zone: 250
+* Max scanlists: 250
+* Max scanlist name length: 16
+* Max channels per scanlist: ??
+* Max talkgroups: 10000
+* Max talkgroup name length: 16
+* Max talkgroup lists: 250
+* Max talkgroups per talkgroup list: ??
+* Max DMR IDs: 250
+* Max DMR ID name length: 16
 
 ## CPS export notes
 
