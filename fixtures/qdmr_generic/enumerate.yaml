@@ -18,8 +18,12 @@ contacts:
   - dmr: {id: cont3, name: ALL CALL, ring: false, type: AllCall, number: 16777215}
   - dmr: {id: cont4, name: Private 33 Ring, ring: true, type: PrivateCall, number: 0}
   - dmr: {id: cont5, name: VERYLONGGROUPNAMESOLONGHOLYCOW, ring: false, type: GroupCall, number: 777}
+  - dmr: {id: cont6, name: Colorado, ring: false, type: GroupCall, number: 3108}
+  - dmr: {id: cont7, name: Colorado HD, ring: false, type: GroupCall, number: 31088}
+  - dmr: {id: cont8, name: KC Wide, ring: false, type: GroupCall, number: 313136}
 groupLists:
   - {id: grp1, name: GroupList A, contacts: [cont1, cont3]}
+  - {id: grp2, name: Brandmeister, contacts: [cont6, cont7, cont8]}
 channels:
   - analog:
       id: ch1
@@ -459,12 +463,49 @@ channels:
       power: !<!default> ""
       timeout: !<!default> ""
       vox: !<!default> ""
+  - analog:
+      id: ch36
+      name: APRS VHF
+      rxFrequency: 144.38999999999999
+      txFrequency: 144.38999999999999
+      rxOnly: false
+      admit: Always
+      bandwidth: Wide
+      power: !<!default> ""
+      timeout: !<!default> ""
+      vox: !<!default> ""
+      squelch: !<!default> ""
 zones:
-  []
+  - id: zone1
+    name: TXTOT ChA
+    A: [ch7, ch8, ch9, ch10]
+    B: []
+  - id: zone2
+    name: VOX ChB
+    A: []
+    B: [ch11, ch12, ch13]
+  - id: zone3
+    name: Split AB
+    A: [ch26, ch27, ch28, ch29, ch30, ch31, ch32]
+    B: [ch18, ch19, ch20]
 scanLists:
   - id: scan1
     name: Scan List A
     channels: [ch2, ch3, ch4, ch5, ch6]
+  - id: scan2
+    name: PriCh
+    primary: ch14
+    channels: [ch7, ch8, ch9, ch10]
+positioning:
+  - aprs:
+      id: aprs1
+      name: APRS APAT81
+      period: 300
+      revert: ch36
+      icon: Node
+      message: Optional Message
+      destination: APAT81-0
+      source: W0CALL-7
 commercial:
   encryptionKeys:
     []
