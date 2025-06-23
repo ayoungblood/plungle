@@ -7,6 +7,7 @@ For an overview of current support, see the [README](../README.md). For model-sp
 * [anytone_x78](radios/anytone_x78.md)
 * [chirp_generic](radios/chirp_generic.md)
 * [opengd77_rt3s](radios/opengd77_rt3s.md)
+* [qdmr_generic](radios/qdmr_generic.md)
 * [tyt_mduv390](radios/tyt_mduv390.md)
 
 ## Properties

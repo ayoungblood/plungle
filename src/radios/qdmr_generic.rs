@@ -104,8 +104,89 @@ impl NumericYamlExt for Yaml<'_> {
 
 // READ ///////////////////////////////////////////////////////////////////////
 
+fn parse_talkgroup_record(opt: &Opt, yaml: &Yaml) -> Result<DmrTalkgroup, Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, THEME.noise, 5, "{:?}", yaml);
+
+    Ok(DmrTalkgroup {
+        index: yaml.as_mapping_get("dmr").unwrap()
+            .as_mapping_get("id").unwrap()
+            .as_str().unwrap()
+            .strip_prefix("cont").unwrap()
+            .parse::<usize>().unwrap(),
+        id: yaml.as_mapping_get("dmr").unwrap()
+            .as_mapping_get("number").unwrap()
+            .as_integer().unwrap() as u32,
+        name: yaml.as_mapping_get("dmr").unwrap()
+            .as_mapping_get("name").unwrap()
+            .as_str().unwrap()
+            .to_string(),
+        call_type: match yaml.as_mapping_get("dmr").unwrap()
+            .as_mapping_get("type").unwrap()
+            .as_str().unwrap() {
+                "GroupCall" => DmrTalkgroupCallType::Group,
+                "PrivateCall" => DmrTalkgroupCallType::Private,
+                "AllCall" => DmrTalkgroupCallType::AllCall,
+                _ => return Err("Unknown call type".into()),
+            },
+        alert: yaml.as_mapping_get("dmr").unwrap()
+            .as_mapping_get("ring").unwrap()
+            .as_bool().unwrap(),
+    })
+}
+
+fn parse_talkgroup_list_record(opt: &Opt, yaml: &Yaml, codeplug: &Codeplug) -> Result<DmrTalkgroupList, Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, THEME.noise, 5, "{:?}", yaml);
+
+    let mut talkgroup_list = DmrTalkgroupList {
+        index: yaml.as_mapping_get("id").unwrap()
+            .as_str().unwrap()
+            .strip_prefix("grp").unwrap()
+            .parse::<usize>().unwrap(),
+        name: yaml.as_mapping_get("name").unwrap()
+            .as_str().unwrap()
+            .to_string(),
+        talkgroups: Vec::new(),
+    };
+    // loop through contact IDs, translate to
+    for id in yaml.as_mapping_get("contacts").unwrap().as_vec().unwrap() {
+        let index: usize = id.as_str().unwrap()
+            .strip_prefix("cont").unwrap()
+            .parse::<usize>().unwrap();
+        // find talkgroup by index
+        let talkgroup = codeplug.talkgroups.iter().find(|tg| tg.index == index);
+        if let Some(tg) = talkgroup {
+            talkgroup_list.talkgroups.push(tg.clone());
+        } else {
+            uprintln!(opt, Stderr, THEME.warn, None, "Talkgroup not found: {}", index);
+        }
+    }
+    Ok(talkgroup_list)
+}
+
+fn parse_tone(yaml: Option<&Yaml>) -> Option<Tone> {
+    if let Some(yaml) = yaml {
+        if let Some(yaml_ctcss) = yaml.as_mapping_get("ctcss") {
+            // qdmr floats aren't very precise, round to 1 decimal place
+            let tone = (yaml_ctcss.as_any_number().unwrap() * 10.0).round() / 10.0;
+            Some(Tone::Ctcss(tone))
+        } else if let Some(yaml_dcs) = yaml.as_mapping_get("dcs") {
+            // qdmr uses negative integers for inverted DCS tones
+            let dcs_int = yaml_dcs.as_integer().unwrap();
+            Some(Tone::Dcs(format!("D{:03}{}", dcs_int.abs(), if dcs_int < 0 { "I" } else { "N" })))
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
 fn parse_channel_record(opt: &Opt, yaml: &Yaml) -> Result<Channel, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 4, "    {:?}", yaml);
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, THEME.noise, 5, "{:?}", yaml);
+
     let mut channel = Channel::default();
     let inner: &Yaml;
     if yaml.as_mapping_get("analog").is_some() {
@@ -154,25 +235,102 @@ fn parse_channel_record(opt: &Opt, yaml: &Yaml) -> Result<Channel, Box<dyn Error
                 Some(sq) => Squelch::Percent(sq as u8 * 10),
                 None => Squelch::default(),
             },
-            tone_rx: None,
-            tone_tx: None,
+            tone_rx: parse_tone(inner.as_mapping_get("rxTone")),
+            tone_tx: parse_tone(inner.as_mapping_get("txTone")),
         });
-        println!("{:?}\n", inner.as_mapping_get("squelch").unwrap().as_integer());
     } else if channel.mode == ChannelMode::DMR {
         channel.dmr = Some(DmrChannel {
-            timeslot: 0,
-            color_code: 0,
+            timeslot: inner.as_mapping_get("timeSlot").unwrap()
+                .as_str().unwrap().strip_prefix("TS").unwrap()
+                .parse::<u8>().unwrap(),
+            color_code: inner.as_mapping_get("colorCode").unwrap()
+                .as_integer().unwrap() as u8,
             talkgroup: None,
             talkgroup_list: None,
             id_name: None,
         });
+        println!("{:?}\n", inner.as_mapping_get("timeSlot"));
     }
 
     Ok(channel)
 }
 
+fn parse_scanlist_record(opt: &Opt, yaml: &Yaml, codeplug: &Codeplug) -> Result<ScanList, Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, THEME.noise, 5, "{:?}", yaml);
+
+    let mut scanlist = ScanList {
+        index: yaml.as_mapping_get("id").unwrap()
+            .as_str().unwrap()
+            .strip_prefix("scan").unwrap()
+            .parse::<usize>().unwrap(),
+        name: yaml.as_mapping_get("name").unwrap()
+            .as_str().unwrap()
+            .to_string(),
+        channels: Vec::new(),
+    };
+    // loop through channel IDs and get channel names
+    for id in yaml.as_mapping_get("channels").unwrap().as_vec().unwrap() {
+        let index: usize = id.as_str().unwrap()
+            .strip_prefix("ch").unwrap()
+            .parse::<usize>().unwrap();
+        // find channel by index
+        let channel = codeplug.channels.iter().find(|c| c.index == index);
+        if let Some(channel) = channel {
+            scanlist.channels.push(channel.name.clone());
+        } else {
+            uprintln!(opt, Stderr, THEME.warn, None, "Channel not found: {}", index);
+        }
+    }
+
+    Ok(scanlist)
+}
+
+fn parse_zone_record(opt: &Opt, yaml: &Yaml, codeplug: &Codeplug) -> Result<Zone, Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, THEME.noise, 5, "{:?}", yaml);
+
+    let mut zone = Zone {
+        index: yaml.as_mapping_get("id").unwrap()
+            .as_str().unwrap()
+            .strip_prefix("zone").unwrap()
+            .parse::<usize>().unwrap(),
+        name: yaml.as_mapping_get("name").unwrap()
+            .as_str().unwrap()
+            .to_string(),
+        channels: Vec::new(),
+    };
+
+    // qdmr does something weird with zones and has them split into A and B groups
+    // parse both and stuff into a single zone
+    for id in yaml.as_mapping_get("A").unwrap().as_vec().unwrap() {
+        let index: usize = id.as_str().unwrap()
+            .strip_prefix("ch").unwrap()
+            .parse::<usize>().unwrap();
+        let channel = codeplug.channels.iter().find(|c| c.index == index);
+        if let Some(channel) = channel {
+            zone.channels.push(channel.name.clone());
+        } else {
+            uprintln!(opt, Stderr, THEME.warn, None, "Channel not found: {}", id.as_str().unwrap());
+        }
+    }
+    for id in yaml.as_mapping_get("B").unwrap().as_vec().unwrap() {
+        let index: usize = id.as_str().unwrap()
+            .strip_prefix("ch").unwrap()
+            .parse::<usize>().unwrap();
+        let channel = codeplug.channels.iter().find(|c| c.index == index);
+        if let Some(channel) = channel {
+            zone.channels.push(channel.name.clone());
+        } else {
+            uprintln!(opt, Stderr, THEME.warn, None, "Channel not found: {}", id.as_str().unwrap());
+        }
+    }
+
+    Ok(zone)
+}
+
 pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
-    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let mut codeplug = Codeplug::default();
@@ -187,13 +345,33 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
     let yaml_str = std::fs::read_to_string(input_path)?;
     let yaml = &(Yaml::load_from_str(&yaml_str).unwrap())[0];
 
-    let options = FormatOptions::default();
-    let formatted_yaml = format_text(&yaml_str, &options)?;
-    uprintln!(opt, Stderr, None, 4, "formatted_yaml:\n{}", formatted_yaml);
+    // let options = FormatOptions::default();
+    // let formatted_yaml = format_text(&yaml_str, &options)?;
+    // uprintln!(opt, Stderr, None, None, "formatted_yaml:\n{}", formatted_yaml);
 
-    for channel in yaml.as_mapping_get("channels").unwrap().as_vec().unwrap() {
-        let channel = parse_channel_record(opt, channel)?;
+    for yaml_talkgroup in yaml.as_mapping_get("contacts").unwrap().as_vec().unwrap() {
+        let talkgroup = parse_talkgroup_record(opt, yaml_talkgroup)?;
+        codeplug.talkgroups.push(talkgroup);
+    }
+
+    for yaml_talkgroup_list in yaml.as_mapping_get("groupLists").unwrap().as_vec().unwrap() {
+        let talkgroup_list = parse_talkgroup_list_record(opt, yaml_talkgroup_list, &codeplug)?;
+        codeplug.talkgroup_lists.push(talkgroup_list);
+    }
+
+    for yaml_channel in yaml.as_mapping_get("channels").unwrap().as_vec().unwrap() {
+        let channel = parse_channel_record(opt, yaml_channel)?;
         codeplug.channels.push(channel);
+    }
+
+    for yaml_scanlist in yaml.as_mapping_get("scanLists").unwrap().as_vec().unwrap() {
+        let scanlist = parse_scanlist_record(opt, yaml_scanlist, &codeplug)?;
+        codeplug.scanlists.push(scanlist);
+    }
+
+    for yaml_zone in yaml.as_mapping_get("zones").unwrap().as_vec().unwrap() {
+        let zone = parse_zone_record(opt, yaml_zone, &codeplug)?;
+        codeplug.zones.push(zone);
     }
 
     codeplug.source = format!("qdmr_v{}", yaml["version"].as_str().unwrap_or("ERR"));
