@@ -202,12 +202,12 @@ fn print_talkgroups(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Er
 
     let mut output = String::new();
     output.push_str(&format!(
-        "\nTGRP:{:3} {:16} {:8} {:4}\n",
-        "idx", "name", "id", "type"
+        "\nTGRP:{:3} {:16} {:8} {:4} {:5}\n",
+        "idx", "name", "id", "type", "alert"
     ));
     for tg in &codeplug.talkgroups {
         output.push_str(&format!(
-            "TGRP {:3} {:16} {:8} {:4}\n",
+            "TGRP {:3} {:16} {:8} {:4} {:5}\n",
             tg.index,
             tg.name,
             tg.id,
@@ -216,6 +216,10 @@ fn print_talkgroups(opt: &Opt, codeplug: &Codeplug) -> Result<String, Box<dyn Er
                 DmrTalkgroupCallType::Private => "priv",
                 DmrTalkgroupCallType::AllCall => "all",
             },
+            match tg.alert {
+                true => "ring",
+                false => "",
+            }
         ));
     }
 
