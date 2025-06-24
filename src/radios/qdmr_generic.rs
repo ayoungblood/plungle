@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::OnceLock;
-use saphyr::{Yaml, LoadableYamlNode, YamlEmitter, Scalar};
+use saphyr::{Yaml, LoadableYamlNode, YamlEmitter, Scalar, Mapping};
 use pretty_yaml::{config::FormatOptions, format_text};
 
 use crate::*;
@@ -412,10 +412,24 @@ pub fn write(opt: &Opt, _codeplug: &Codeplug, output_path: &PathBuf) -> Result<(
         return Err("Output path already exists".into());
     }
 
+    // create the top level map
+    let mut yaml_map = Mapping::new();
+    yaml_map.insert(
+        Yaml::Value(Scalar::String("version".into())),
+        Yaml::Value(Scalar::String("0.11.2".into())),
+    );
+
+    // wrap the map in a Yaml::Mapping and serialize
+    let yaml = Yaml::Mapping(yaml_map);
     let mut yaml_str = String::new();
     let mut emitter = YamlEmitter::new(&mut yaml_str);
-    emitter.dump(&Yaml::Value(Scalar::Integer(0)))?;
+    emitter.dump(&yaml)?;
+
+    // @TODO remove me
     println!("{}", yaml_str);
+
+    // Write the YAML string to the output file
+    std::fs::write(output_path, yaml_str)?;
 
     Ok(())
 }
