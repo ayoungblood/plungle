@@ -44,7 +44,8 @@ impl NumericYamlExt for Yaml<'_> {
 }
 
 // QDMR uses YAML for storing codeplugs
-// As of QDMR 0.11.2, the format is as follows
+// The format is very well documented here: https://dm3mat.darc.de/qdmr/manual/ch03.html
+// As of QDMR 0.11.2, the format is as follows:
 // version: version string (0.11.2)
 // settings:
 //   introLine1: string
@@ -183,7 +184,7 @@ fn parse_tone(yaml: Option<&Yaml>) -> Option<Tone> {
     }
 }
 
-fn parse_channel_record(opt: &Opt, yaml: &Yaml) -> Result<Channel, Box<dyn Error>> {
+fn parse_channel_record(opt: &Opt, yaml: &Yaml, all_yaml: &Yaml) -> Result<Channel, Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
     uprintln!(opt, Stderr, THEME.noise, 5, "{:?}", yaml);
 
@@ -198,7 +199,7 @@ fn parse_channel_record(opt: &Opt, yaml: &Yaml) -> Result<Channel, Box<dyn Error
     } else {
         return Err("Invalid channel record".into());
     }
-    //println!("inner: {:?}", inner);
+    // parse common fields
     channel.index = inner.as_mapping_get("id").unwrap().as_str().unwrap().strip_prefix("ch").unwrap().parse::<usize>().unwrap();
     channel.name = inner.as_mapping_get("name").unwrap().as_str().unwrap().to_string();
     channel.frequency_rx = Frequency::from_mhz(inner.as_mapping_get("rxFrequency").unwrap().as_any_number()?);
@@ -222,7 +223,16 @@ fn parse_channel_record(opt: &Opt, yaml: &Yaml) -> Result<Channel, Box<dyn Error
             _ => return Err("Invalid power level".into()),
         };
     }
-    // @TODO ADMIT
+    if let Some(scan_list_ref) = inner.as_mapping_get("scanListRef") {
+        let scan_list_id = scan_list_ref.as_str().unwrap();
+        // scanlists haven't been parsed yet, so we have to search scanlists by ID
+        for scanlist_yaml in all_yaml.as_mapping_get("scanLists").unwrap().as_vec().unwrap() {
+            if scanlist_yaml.as_mapping_get("id").unwrap().as_str().unwrap() == scan_list_id {
+                channel.scan = Some(Scan::ScanList(scanlist_yaml.as_mapping_get("name").unwrap().as_str().unwrap().to_string()));
+                break;
+            }
+        }
+    }
     // mode-specific fields
     if channel.mode == ChannelMode::FM {
         channel.fm = Some(FmChannel {
@@ -238,6 +248,12 @@ fn parse_channel_record(opt: &Opt, yaml: &Yaml) -> Result<Channel, Box<dyn Error
             tone_rx: parse_tone(inner.as_mapping_get("rxTone")),
             tone_tx: parse_tone(inner.as_mapping_get("txTone")),
         });
+        channel.tx_permit = match inner.as_mapping_get("admit").unwrap().as_str().unwrap() {
+            "Always" => Some(TxPermit::Always),
+            "Free" => Some(TxPermit::ChannelFree),
+            "Tone" => Some(TxPermit::CtcssDcsDifferent), // @TODO: verify this
+            _ => return Err("Invalid TX permit".into()),
+        };
     } else if channel.mode == ChannelMode::DMR {
         channel.dmr = Some(DmrChannel {
             timeslot: inner.as_mapping_get("timeSlot").unwrap()
@@ -249,7 +265,12 @@ fn parse_channel_record(opt: &Opt, yaml: &Yaml) -> Result<Channel, Box<dyn Error
             talkgroup_list: None,
             id_name: None,
         });
-        println!("{:?}\n", inner.as_mapping_get("timeSlot"));
+        channel.tx_permit = match inner.as_mapping_get("admit").unwrap().as_str().unwrap() {
+            "Always" => Some(TxPermit::Always),
+            "Free" => Some(TxPermit::ChannelFree),
+            "ColorCode" => Some(TxPermit::ColorCodeSame), // @TODO: verify this
+            _ => return Err("Invalid TX permit".into()),
+        };
     }
 
     Ok(channel)
@@ -345,9 +366,9 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
     let yaml_str = std::fs::read_to_string(input_path)?;
     let yaml = &(Yaml::load_from_str(&yaml_str).unwrap())[0];
 
-    // let options = FormatOptions::default();
-    // let formatted_yaml = format_text(&yaml_str, &options)?;
-    // uprintln!(opt, Stderr, None, None, "formatted_yaml:\n{}", formatted_yaml);
+    let options = FormatOptions::default();
+    let formatted_yaml = format_text(&yaml_str, &options)?;
+    uprintln!(opt, Stderr, THEME.noise, 5, "{}", formatted_yaml);
 
     for yaml_talkgroup in yaml.as_mapping_get("contacts").unwrap().as_vec().unwrap() {
         let talkgroup = parse_talkgroup_record(opt, yaml_talkgroup)?;
@@ -360,7 +381,7 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
     }
 
     for yaml_channel in yaml.as_mapping_get("channels").unwrap().as_vec().unwrap() {
-        let channel = parse_channel_record(opt, yaml_channel)?;
+        let channel = parse_channel_record(opt, yaml_channel, yaml)?;
         codeplug.channels.push(channel);
     }
 

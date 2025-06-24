@@ -24,8 +24,9 @@ pub fn parse_codeplug(opt: &Opt, model: &String, input: &PathBuf) -> Result<Code
     read_functions.insert("anytone_x78", anytone_x78::read);
     read_functions.insert("chirp_generic", chirp_generic::read);
     read_functions.insert("opengd77_rt3s", opengd77_rt3s::read);
-    read_functions.insert("tyt_mduv390", tyt_mduv390::read);
     read_functions.insert("qdmr_generic", qdmr_generic::read);
+    read_functions.insert("tyt_mduv390", tyt_mduv390::read);
+
 
     // look up the radio model in the hashmap
     if let Some(read_function) = read_functions.get(model.as_str()) {
