@@ -446,7 +446,7 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 
 fn write_settings(opt: &Opt) -> Result<Mapping, Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
-    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+    uprintln!(opt, Stderr, None, 1, "Building settings YAML");
 
     let mut settings_map = Mapping::new();
     settings_map.insert(
@@ -487,13 +487,23 @@ fn write_settings(opt: &Opt) -> Result<Mapping, Box<dyn Error>> {
 
 fn write_radio_ids<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequence<'a>, Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
-    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+    uprintln!(opt, Stderr, None, 1, "Building radioIDs YAML");
 
-    let radio_ids_vec = Sequence::new();
+    let mut radio_ids_vec = Sequence::new();
     if let Some(config) = &codeplug.config {
         if let Some(dmr_config) = &config.dmr_configuration {
-            for dmr_id in &dmr_config.id_list {
-                println!("DMR ID: {:?}", dmr_id);
+
+            for (ii, dmr_id) in dmr_config.id_list.iter().enumerate() {
+                let mut dmr_map = Mapping::new();
+                dmr_map.insert(
+                    Yaml::Value(Scalar::String("dmr".into())),
+                    Yaml::Mapping(Mapping::from_iter([
+                        (Yaml::Value(Scalar::String("id".into())), Yaml::Value(Scalar::String(format!("id{}", ii + 1).into()))),
+                        (Yaml::Value(Scalar::String("name".into())), Yaml::Value(Scalar::String(dmr_id.name.clone().into()))),
+                        (Yaml::Value(Scalar::String("number".into())), Yaml::Value(Scalar::Integer(dmr_id.id as i64))),
+                    ])),
+                );
+                radio_ids_vec.push(Yaml::Mapping(dmr_map));
             }
         }
     }
@@ -501,18 +511,38 @@ fn write_radio_ids<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequence<'a>
     Ok(radio_ids_vec)
 }
 
-fn write_talkgroups(opt: &Opt) -> Result<Sequence, Box<dyn Error>> {
+fn write_talkgroups<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequence<'a>, Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
-    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+    uprintln!(opt, Stderr, None, 1, "Building contacts YAML");
 
-    let contacts_vec = Sequence::new();
+    let mut contacts_vec = Sequence::new();
+    if !codeplug.talkgroups.is_empty() {
+        for (ii, talkgroup) in codeplug.talkgroups.iter().enumerate() {
+            let mut dmr_map = Mapping::new();
+            dmr_map.insert(
+                Yaml::Value(Scalar::String("dmr".into())),
+                Yaml::Mapping(Mapping::from_iter([
+                    (Yaml::Value(Scalar::String("id".into())), Yaml::Value(Scalar::String(format!("cont{}", ii + 1).into()))),
+                    (Yaml::Value(Scalar::String("name".into())), Yaml::Value(Scalar::String(talkgroup.name.clone().into()))),
+                    (Yaml::Value(Scalar::String("ring".into())), Yaml::Value(Scalar::Boolean(talkgroup.alert))),
+                    (Yaml::Value(Scalar::String("type".into())), Yaml::Value(Scalar::String(match talkgroup.call_type {
+                        DmrTalkgroupCallType::Group => "GroupCall",
+                        DmrTalkgroupCallType::Private => "PrivateCall",
+                        DmrTalkgroupCallType::AllCall => "AllCall",
+                    }.into()))),
+                    (Yaml::Value(Scalar::String("number".into())), Yaml::Value(Scalar::Integer(talkgroup.id as i64))),
+                ])),
+            );
+            contacts_vec.push(Yaml::Mapping(dmr_map));
+        }
+    }
 
     Ok(contacts_vec)
 }
 
 fn write_talkgroup_lists(opt: &Opt) -> Result<Sequence, Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
-    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+    uprintln!(opt, Stderr, None, 1, "Building groupLists YAML");
 
     let talkgroup_lists_vec = Sequence::new();
 
@@ -521,7 +551,7 @@ fn write_talkgroup_lists(opt: &Opt) -> Result<Sequence, Box<dyn Error>> {
 
 fn write_channels(opt: &Opt) -> Result<Sequence, Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
-    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+    uprintln!(opt, Stderr, None, 1, "Building channels YAML");
 
     let channels_vec = Sequence::new();
 
@@ -530,7 +560,7 @@ fn write_channels(opt: &Opt) -> Result<Sequence, Box<dyn Error>> {
 
 fn write_zones(opt: &Opt) -> Result<Sequence, Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
-    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+    uprintln!(opt, Stderr, None, 1, "Building zones YAML");
 
     let zones_vec = Sequence::new();
 
@@ -569,7 +599,7 @@ pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<()
     // add the talkgroups vec
     yaml_map.insert(
         Yaml::Value(Scalar::String("contacts".into())),
-        Yaml::Sequence(write_talkgroups(opt)?),
+        Yaml::Sequence(write_talkgroups(opt, codeplug)?),
     );
 
     // add the talkgroup lists vec
@@ -605,7 +635,8 @@ pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<()
     let yaml = Yaml::Mapping(yaml_map);
     let mut yaml_str = String::new();
     let mut emitter = YamlEmitter::new(&mut yaml_str);
-    emitter.compact(false);
+    emitter.compact(true);
+    println!("{:?}", emitter.is_compact());
     emitter.dump(&yaml)?;
 
     // @TODO remove me
