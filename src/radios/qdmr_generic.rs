@@ -105,6 +105,17 @@ impl NumericYamlExt for Yaml<'_> {
 
 // READ ///////////////////////////////////////////////////////////////////////
 
+fn parse_configuration(opt: &Opt, yaml: &Yaml) -> () {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, THEME.noise, 5, "{:?}", yaml);
+
+    println!("{:?}", yaml.as_mapping_get("radioIDs").unwrap());
+    // for dmr in  {
+    //     println!("{:?}", dmr);
+    // }
+    ()
+}
+
 fn parse_talkgroup_record(opt: &Opt, yaml: &Yaml) -> Result<DmrTalkgroup, Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
     uprintln!(opt, Stderr, THEME.noise, 5, "{:?}", yaml);
@@ -370,6 +381,8 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
     let formatted_yaml = format_text(&yaml_str, &options)?;
     uprintln!(opt, Stderr, THEME.noise, 5, "{}", formatted_yaml);
 
+    parse_configuration(opt, &yaml);
+
     for yaml_talkgroup in yaml.as_mapping_get("contacts").unwrap().as_vec().unwrap() {
         let talkgroup = parse_talkgroup_record(opt, yaml_talkgroup)?;
         codeplug.talkgroups.push(talkgroup);
@@ -448,6 +461,13 @@ fn write_radio_ids<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequence<'a>
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let radio_ids_vec = Sequence::new();
+    if let Some(config) = &codeplug.config {
+        if let Some(dmr_config) = &config.dmr_configuration {
+            for dmr_id in &dmr_config.id_list {
+                println!("DMR ID: {:?}", dmr_id);
+            }
+        }
+    }
 
     Ok(radio_ids_vec)
 }
