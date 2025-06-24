@@ -383,29 +383,47 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 
     parse_configuration(opt, &yaml);
 
-    for yaml_talkgroup in yaml.as_mapping_get("contacts").unwrap().as_vec().unwrap() {
-        let talkgroup = parse_talkgroup_record(opt, yaml_talkgroup)?;
-        codeplug.talkgroups.push(talkgroup);
+    if let Some(talkgroups_vec) = yaml.as_mapping_get("contacts")
+        .and_then(|yaml_talkgroups| yaml_talkgroups.as_vec()) {
+        for yaml_talkgroup in talkgroups_vec {
+            let talkgroup = parse_talkgroup_record(opt, yaml_talkgroup)?;
+            codeplug.talkgroups.push(talkgroup);
+        }
     }
 
-    for yaml_talkgroup_list in yaml.as_mapping_get("groupLists").unwrap().as_vec().unwrap() {
-        let talkgroup_list = parse_talkgroup_list_record(opt, yaml_talkgroup_list, &codeplug)?;
-        codeplug.talkgroup_lists.push(talkgroup_list);
+    if let Some(talkgroup_lists_vec) = yaml.as_mapping_get("groupLists")
+        .and_then(|yaml_talkgroup_lists| yaml_talkgroup_lists.as_vec()) {
+        for yaml_talkgroup_list in talkgroup_lists_vec {
+            let talkgroup_list = parse_talkgroup_list_record(opt, yaml_talkgroup_list, &codeplug)?;
+            codeplug.talkgroup_lists.push(talkgroup_list);
+        }
     }
 
-    for yaml_channel in yaml.as_mapping_get("channels").unwrap().as_vec().unwrap() {
-        let channel = parse_channel_record(opt, yaml_channel, yaml)?;
-        codeplug.channels.push(channel);
+    if let Some(channels_vec) = yaml.as_mapping_get("channels")
+        .and_then(|yaml_channels| yaml_channels.as_vec()) {
+        for yaml_channel in channels_vec {
+            let channel = parse_channel_record(opt, yaml_channel, yaml)?;
+            codeplug.channels.push(channel);
+        }
+    } else {
+        uprintln!(opt, Stderr, THEME.err, None, "Channels vector not found in codeplug");
+        return Err("Invalid codeplug".into());
     }
 
-    for yaml_scanlist in yaml.as_mapping_get("scanLists").unwrap().as_vec().unwrap() {
-        let scanlist = parse_scanlist_record(opt, yaml_scanlist, &codeplug)?;
-        codeplug.scanlists.push(scanlist);
+    if let Some(scanlists_vec) = yaml.as_mapping_get("scanLists")
+        .and_then(|yaml_scanlists| yaml_scanlists.as_vec()) {
+        for yaml_scanlist in scanlists_vec {
+            let scanlist = parse_scanlist_record(opt, yaml_scanlist, &codeplug)?;
+            codeplug.scanlists.push(scanlist);
+        }
     }
 
-    for yaml_zone in yaml.as_mapping_get("zones").unwrap().as_vec().unwrap() {
-        let zone = parse_zone_record(opt, yaml_zone, &codeplug)?;
-        codeplug.zones.push(zone);
+    if let Some(zones_vec) = yaml.as_mapping_get("zones")
+        .and_then(|yaml_zones| yaml_zones.as_vec()) {
+        for yaml_zone in zones_vec {
+            let zone = parse_zone_record(opt, yaml_zone, &codeplug)?;
+            codeplug.zones.push(zone);
+        }
     }
 
     codeplug.source = format!("qdmr_v{}", yaml["version"].as_str().unwrap_or("ERR"));
