@@ -1,0 +1,25 @@
+---
+version: 0.11.2
+settings:
+  introLine1: ""
+  introLine2: ""
+  micLevel: 3
+  speech: false
+  power: High
+  squelch: 1
+  vox: 0
+  tot: 0
+radioIDs:
+  []
+contacts:
+  []
+groupLists:
+  []
+channels:
+  []
+zones:
+  []
+commercial:
+  encryptionKeys:
+    []
+...

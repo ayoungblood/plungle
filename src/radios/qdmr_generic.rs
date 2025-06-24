@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::OnceLock;
-use saphyr::{Yaml, LoadableYamlNode, YamlEmitter, Scalar, Mapping};
+use saphyr::{Yaml, LoadableYamlNode, YamlEmitter, Scalar, Sequence, Mapping};
 use pretty_yaml::{config::FormatOptions, format_text};
 
 use crate::*;
@@ -402,7 +402,93 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 
 // WRITE //////////////////////////////////////////////////////////////////////
 
-pub fn write(opt: &Opt, _codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
+fn write_settings(opt: &Opt) -> Result<Mapping, Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    let mut settings_map = Mapping::new();
+    settings_map.insert(
+        Yaml::Value(Scalar::String("introLine1".into())),
+        Yaml::Value(Scalar::String("".into())),
+    );
+    settings_map.insert(
+        Yaml::Value(Scalar::String("introLine2".into())),
+        Yaml::Value(Scalar::String("".into())),
+    );
+    settings_map.insert(
+        Yaml::Value(Scalar::String("micLevel".into())),
+        Yaml::Value(Scalar::Integer(3)),
+    );
+    settings_map.insert(
+        Yaml::Value(Scalar::String("speech".into())),
+        Yaml::Value(Scalar::Boolean(false)),
+    );
+    settings_map.insert(
+        Yaml::Value(Scalar::String("power".into())),
+        Yaml::Value(Scalar::String("High".into())),
+    );
+    settings_map.insert(
+        Yaml::Value(Scalar::String("squelch".into())),
+        Yaml::Value(Scalar::Integer(1)),
+    );
+    settings_map.insert(
+        Yaml::Value(Scalar::String("vox".into())),
+        Yaml::Value(Scalar::Integer(0)),
+    );
+    settings_map.insert(
+        Yaml::Value(Scalar::String("tot".into())),
+        Yaml::Value(Scalar::Integer(0)),
+    );
+
+    Ok(settings_map)
+}
+
+fn write_radio_ids<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequence<'a>, Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    let radio_ids_vec = Sequence::new();
+
+    Ok(radio_ids_vec)
+}
+
+fn write_talkgroups(opt: &Opt) -> Result<Sequence, Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    let contacts_vec = Sequence::new();
+
+    Ok(contacts_vec)
+}
+
+fn write_talkgroup_lists(opt: &Opt) -> Result<Sequence, Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    let talkgroup_lists_vec = Sequence::new();
+
+    Ok(talkgroup_lists_vec)
+}
+
+fn write_channels(opt: &Opt) -> Result<Sequence, Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    let channels_vec = Sequence::new();
+
+    Ok(channels_vec)
+}
+
+fn write_zones(opt: &Opt) -> Result<Sequence, Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    let zones_vec = Sequence::new();
+
+    Ok(zones_vec)
+}
+
+pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
@@ -419,10 +505,58 @@ pub fn write(opt: &Opt, _codeplug: &Codeplug, output_path: &PathBuf) -> Result<(
         Yaml::Value(Scalar::String("0.11.2".into())),
     );
 
+    // add the settings map
+    yaml_map.insert(
+        Yaml::Value(Scalar::String("settings".into())),
+        Yaml::Mapping(write_settings(opt)?),
+    );
+
+    // add the radio IDs vec
+    yaml_map.insert(
+        Yaml::Value(Scalar::String("radioIDs".into())),
+        Yaml::Sequence(write_radio_ids(opt, codeplug)?),
+    );
+
+    // add the talkgroups vec
+    yaml_map.insert(
+        Yaml::Value(Scalar::String("contacts".into())),
+        Yaml::Sequence(write_talkgroups(opt)?),
+    );
+
+    // add the talkgroup lists vec
+    yaml_map.insert(
+        Yaml::Value(Scalar::String("groupLists".into())),
+        Yaml::Sequence(write_talkgroup_lists(opt)?),
+    );
+
+    // add the channels vec
+    yaml_map.insert(
+        Yaml::Value(Scalar::String("channels".into())),
+        Yaml::Sequence(write_channels(opt)?),
+    );
+
+    // add the zones vec
+    yaml_map.insert(
+        Yaml::Value(Scalar::String("zones".into())),
+        Yaml::Sequence(write_zones(opt)?),
+    );
+
+    // add the commercial map for parity
+    let mut commercial_map: Mapping = Mapping::new();
+    commercial_map.insert(
+        Yaml::Value(Scalar::String("encryptionKeys".into())),
+        Yaml::Sequence(Sequence::new()),
+    );
+    yaml_map.insert(
+        Yaml::Value(Scalar::String("commercial".into())),
+        Yaml::Mapping(commercial_map),
+    );
+
     // wrap the map in a Yaml::Mapping and serialize
     let yaml = Yaml::Mapping(yaml_map);
     let mut yaml_str = String::new();
     let mut emitter = YamlEmitter::new(&mut yaml_str);
+    emitter.compact(false);
     emitter.dump(&yaml)?;
 
     // @TODO remove me
