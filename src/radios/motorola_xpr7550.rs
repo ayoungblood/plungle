@@ -77,8 +77,6 @@ struct XmlTalkgroupContent {
 }
 type XmlTalkgroupHash = HashMap<String, XmlTalkgroupContent>;
 
-
-
 // READ ///////////////////////////////////////////////////////////////////////
 
 fn get_list_id(e: &quick_xml::events::BytesStart) -> Option<usize> {
@@ -97,7 +95,7 @@ fn get_list_id(e: &quick_xml::events::BytesStart) -> Option<usize> {
 }
 
 fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     let mut channel = Channel::default();
     channel.index = id + 1; // channels are zero-indexed in the XML
                             // contents is a string of XML
@@ -158,10 +156,9 @@ fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel,
     for fieldname in channel_hash.keys().sorted() {
         let field = channel_hash.get(fieldname).unwrap();
         if field.applicable == XmlApplicable::Enabled {
-            println!("{:03} {:40} {:40} {:?}", field.list_id, fieldname, field.value, field.type_id);
+            uprintln!(opt, Stderr, THEME.noise, 5, "{:03} {:40} {:40} {:?}", field.list_id, fieldname, field.value, field.type_id);
         }
     }
-    eprintln!("channel.index: {}, field.list_id: {}", channel.index, channel_hash.get("CP_TOT").unwrap().list_id);
     // set channel parameters
     // CP_CNVPERSALIAS: channel name, with HTML entities for special characters
     channel.name = match decode_html(&channel_hash.get("CP_CNVPERSALIAS").unwrap().value.to_string()) {
@@ -277,8 +274,8 @@ fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel,
     Ok(channel)
 }
 
-fn parse_talkgroup_record(opt: &Opt, id: usize, contents: &str) -> Result<DmrTalkgroup, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+fn parse_talkgroup_record(opt: &Opt, contents: &str) -> Result<DmrTalkgroup, Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     // munge the XML into a hash
     let mut reader = Reader::from_str(contents);
     let mut hash = XmlTalkgroupHash::new();
@@ -329,7 +326,7 @@ fn parse_talkgroup_record(opt: &Opt, id: usize, contents: &str) -> Result<DmrTal
     for fieldname in hash.keys().sorted() {
         let field = hash.get(fieldname).unwrap();
         if field.applicable == XmlApplicable::Enabled {
-            uprintln!(opt, Stderr, None, 5, "{:40} {:40} {:3} {:3}", fieldname, field.value, field.list_id, field.list_let_id);
+            uprintln!(opt, Stderr, THEME.noise, 5, "{:40} {:40} {:3} {:3}", fieldname, field.value, field.list_id, field.list_let_id);
         }
     }
 
@@ -352,7 +349,7 @@ fn parse_talkgroup_record(opt: &Opt, id: usize, contents: &str) -> Result<DmrTal
 // The CPS saves an encrypted XML file (*.ctb), which must be decrypted for this to work
 // Channel data lives in <LTD_CODEPLUG<APP_PARTITION<CNV_PER_CMP_TYPE_GRP<CNV_PER_CMP_TYPE
 pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     let mut codeplug = Codeplug::default();
@@ -405,13 +402,9 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
                         }
                     },
                     b"DIGITAL_UCL_DLL_TYPE" => {
-                        let id = get_list_id(&e);
-                        if let Some(id) = id {
-                            let contents =
-                                reader.read_text(QName(b"DIGITAL_UCL_DLL_TYPE"))?.into_owned();
-                            let talkgroup = parse_talkgroup_record(opt, id, &contents)?;
-                            codeplug.talkgroups.push(talkgroup);
-                        }
+                        let contents = reader.read_text(QName(b"DIGITAL_UCL_DLL_TYPE"))?.into_owned();
+                        let talkgroup = parse_talkgroup_record(opt, &contents)?;
+                        codeplug.talkgroups.push(talkgroup);
                     },
                     _ => {}
                 }
@@ -427,17 +420,17 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 
 // WRITE //////////////////////////////////////////////////////////////////////
 
-fn write_channel_fm(opt: &Opt, channel: &Channel) -> () {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+fn write_channel_fm(opt: &Opt, _channel: &Channel) -> () {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
 
 }
 
-fn write_channel_dmr(opt: &Opt, channel: &Channel) -> () {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+fn write_channel_dmr(opt: &Opt, _channel: &Channel) -> () {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
 }
 
 fn write_channels(codeplug: &Codeplug, path: &Path, opt: &Opt)  -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 1, "Writing {}", path.display());
 
     for channel in &codeplug.channels {
@@ -452,8 +445,8 @@ fn write_channels(codeplug: &Codeplug, path: &Path, opt: &Opt)  -> Result<(), Bo
 }
 
 
-pub fn write(codeplug: &Codeplug, output_path: &PathBuf, opt: &Opt) -> Result<(), Box<dyn Error>> {
-    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 
     // if the output path exists, complain
