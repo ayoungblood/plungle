@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::OnceLock;
-use saphyr::{Yaml, LoadableYamlNode};
+use saphyr::{Yaml, LoadableYamlNode, YamlEmitter, Scalar};
 use pretty_yaml::{config::FormatOptions, format_text};
 
 use crate::*;
@@ -401,3 +401,21 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 }
 
 // WRITE //////////////////////////////////////////////////////////////////////
+
+pub fn write(opt: &Opt, _codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    // if the output path exists, complain
+    if output_path.exists() {
+        uprintln!(opt, Stderr, THEME.err, None, "Output path already exists: {}", output_path.display());
+        return Err("Output path already exists".into());
+    }
+
+    let mut yaml_str = String::new();
+    let mut emitter = YamlEmitter::new(&mut yaml_str);
+    emitter.dump(&Yaml::Value(Scalar::Integer(0)))?;
+    println!("{}", yaml_str);
+
+    Ok(())
+}
