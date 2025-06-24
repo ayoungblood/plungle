@@ -58,6 +58,7 @@ enum XmlApplicable {
     Disabled,
     Na,
 }
+
 #[derive(Debug)]
 struct XmlChannelFieldContent {
     value: String,
@@ -65,8 +66,18 @@ struct XmlChannelFieldContent {
     applicable: XmlApplicable,
     list_id: usize,
 }
-
 type XmlChannelHash = HashMap<String, XmlChannelFieldContent>;
+
+#[derive(Debug)]
+struct XmlTalkgroupContent {
+    value: String,
+    applicable: XmlApplicable,
+    list_id: usize,
+    list_let_id: usize,
+}
+type XmlTalkgroupHash = HashMap<String, XmlTalkgroupContent>;
+
+
 
 // READ ///////////////////////////////////////////////////////////////////////
 
@@ -266,6 +277,77 @@ fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel,
     Ok(channel)
 }
 
+fn parse_talkgroup_record(opt: &Opt, id: usize, contents: &str) -> Result<DmrTalkgroup, Box<dyn Error>> {
+    uprintln!(opt, Stderr, None, 2, "{}:{}()", file!(), function!());
+    // munge the XML into a hash
+    let mut reader = Reader::from_str(contents);
+    let mut hash = XmlTalkgroupHash::new();
+    reader.config_mut().trim_text(true);
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Err(e) => panic!("Error at position {}: {:?}", reader.error_position(), e),
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(e)) => {
+                // parse content
+                let content = XmlTalkgroupContent {
+                    value: reader.read_text(e.name())?.into_owned(),
+                    applicable: e
+                        .attributes()
+                        .find(|a| a.as_ref().unwrap().key == quick_xml::name::QName(b"Applicable"))
+                        .map(|a| a.unwrap().value).as_ref()
+                        .map(|v| match std::str::from_utf8(v).unwrap() {
+                            "Enabled" => XmlApplicable::Enabled,
+                            "Disabled" => XmlApplicable::Disabled,
+                            "NA" => XmlApplicable::Na,
+                            _ => panic!(
+                                "Unknown Applicable value: {}",
+                                std::str::from_utf8(v).unwrap()
+                            ),
+                        }).unwrap(),
+                    list_id: e
+                        .attributes()
+                        .find(|a| a.as_ref().unwrap().key == quick_xml::name::QName(b"ListID"))
+                        .map(|a| a.unwrap().value).as_ref()
+                        .map(|v| std::str::from_utf8(v).unwrap().parse::<usize>().unwrap()).unwrap(),
+                    list_let_id: e
+                        .attributes()
+                        .find(|a| a.as_ref().unwrap().key == quick_xml::name::QName(b"ListLetID"))
+                        .map(|a| a.unwrap().value).as_ref()
+                        .map(|v| std::str::from_utf8(v).unwrap().parse::<usize>().unwrap()).unwrap(),
+                };
+                // add to the hashmap
+                hash.insert(
+                    String::from_utf8_lossy(e.name().as_ref()).to_string(),
+                    content,
+                );
+            }
+            _ => (),
+        }
+    }
+    // print out the channel_hash
+    for fieldname in hash.keys().sorted() {
+        let field = hash.get(fieldname).unwrap();
+        if field.applicable == XmlApplicable::Enabled {
+            uprintln!(opt, Stderr, None, 5, "{:40} {:40} {:3} {:3}", fieldname, field.value, field.list_id, field.list_let_id);
+        }
+    }
+
+    let talkgroup = DmrTalkgroup {
+        index: hash.get("DU_CALLALIAS").unwrap().list_let_id as usize,
+        id: hash.get("DU_CALLLSTID").unwrap().value.parse::<u32>().unwrap(),
+        name: hash.get("DU_CALLALIAS").unwrap().value.clone(),
+        call_type: match hash.get("DU_CALLTYPE").unwrap().value.as_str() {
+            "GRPCALL" => DmrTalkgroupCallType::Group,
+            "PRIVCALL" => DmrTalkgroupCallType::Private,
+            "DGTLALLSYSCALL" => DmrTalkgroupCallType::AllCall,
+            _ => return Err("Invalid call type".into()),
+        },
+        alert: false, // @TODO FIXME
+    };
+    Ok(talkgroup)
+}
+
 // This is specific to CPS 16 build 828 codeplugs
 // The CPS saves an encrypted XML file (*.ctb), which must be decrypted for this to work
 // Channel data lives in <LTD_CODEPLUG<APP_PARTITION<CNV_PER_CMP_TYPE_GRP<CNV_PER_CMP_TYPE
@@ -321,7 +403,16 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
                             let channel = parse_channel_record(opt, id, &contents)?;
                             codeplug.channels.push(channel);
                         }
-                    }
+                    },
+                    b"DIGITAL_UCL_DLL_TYPE" => {
+                        let id = get_list_id(&e);
+                        if let Some(id) = id {
+                            let contents =
+                                reader.read_text(QName(b"DIGITAL_UCL_DLL_TYPE"))?.into_owned();
+                            let talkgroup = parse_talkgroup_record(opt, id, &contents)?;
+                            codeplug.talkgroups.push(talkgroup);
+                        }
+                    },
                     _ => {}
                 }
             }
