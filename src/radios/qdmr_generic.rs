@@ -105,15 +105,26 @@ impl NumericYamlExt for Yaml<'_> {
 
 // READ ///////////////////////////////////////////////////////////////////////
 
-fn parse_configuration(opt: &Opt, yaml: &Yaml) -> () {
+fn parse_configuration(opt: &Opt, yaml: &Yaml) -> Option<Configuration> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
     uprintln!(opt, Stderr, THEME.noise, 5, "{:?}", yaml);
 
-    println!("{:?}", yaml.as_mapping_get("radioIDs").unwrap());
-    // for dmr in  {
-    //     println!("{:?}", dmr);
-    // }
-    ()
+    if let Some(yaml_radio_ids) = yaml.as_mapping_get("radioIDs").and_then(|yaml_radio_ids| yaml_radio_ids.as_vec()) {
+        let mut dmr_config = DmrConfiguration::default();
+        for radio_id in yaml_radio_ids {
+            if let Some(dmr) = radio_id.as_mapping_get("dmr") {
+                println!("{:?}", dmr);
+                dmr_config.id_list.push(DmrId {
+                    id: dmr.as_mapping_get("number").unwrap().as_integer().unwrap() as u32,
+                    name: dmr.as_mapping_get("name").unwrap().as_str().unwrap().to_string(),
+                });
+            }
+        }
+        return Some(Configuration {
+            dmr_configuration: Some(dmr_config),
+        });
+    }
+    None
 }
 
 fn parse_talkgroup_record(opt: &Opt, yaml: &Yaml) -> Result<DmrTalkgroup, Box<dyn Error>> {
@@ -381,7 +392,7 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
     let formatted_yaml = format_text(&yaml_str, &options)?;
     uprintln!(opt, Stderr, THEME.noise, 5, "{}", formatted_yaml);
 
-    parse_configuration(opt, &yaml);
+    codeplug.config = parse_configuration(opt, &yaml);
 
     if let Some(talkgroups_vec) = yaml.as_mapping_get("contacts")
         .and_then(|yaml_talkgroups| yaml_talkgroups.as_vec()) {

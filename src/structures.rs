@@ -158,7 +158,7 @@ pub struct DmrId {
 }
 
 /// DMR Configuration
-#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Default)]
 pub struct DmrConfiguration {
     pub id_list: Vec<DmrId>,
 }
