@@ -101,7 +101,6 @@ fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel,
                             // contents is a string of XML
     let mut reader = Reader::from_str(contents);
     let mut channel_hash = XmlChannelHash::new();
-    //eprintln!("contents = {}", contents);
     reader.config_mut().trim_text(true);
     let mut buf = Vec::new();
     loop {
@@ -140,9 +139,6 @@ fn parse_channel_record(opt: &Opt, id: usize, contents: &str) -> Result<Channel,
                         .map(|v| std::str::from_utf8(v).unwrap().parse::<usize>().unwrap())
                         .unwrap(),
                 };
-                // println!("e.name = {:?}", e.name());
-                // println!("    value = {:?}", reader.read_text(e.name())?.into_owned());
-                // println!("    attributes = {:?}", e.attributes().map(|a| a.unwrap()).collect::<Vec<_>>());
                 // add to the hashmap
                 channel_hash.insert(
                     String::from_utf8_lossy(e.name().as_ref()).to_string(),
@@ -373,9 +369,6 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
             format!("{} is not a file", input_path.display()),
         )));
     }
-    // set up the XML parser
-    // let file = File::open(input_path)?;
-    // let reader = BufReader::new(file);
     // read the file in as bytes
     let contents = std::fs::read(input_path)?;
     // parse the XML
@@ -414,7 +407,6 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
         }
         buf.clear();
     }
-
     Ok(codeplug)
 }
 
@@ -422,7 +414,6 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 
 fn write_channel_fm(opt: &Opt, _channel: &Channel) -> () {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
-
 }
 
 fn write_channel_dmr(opt: &Opt, _channel: &Channel) -> () {
@@ -443,7 +434,6 @@ fn write_channels(codeplug: &Codeplug, path: &Path, opt: &Opt)  -> Result<(), Bo
     }
     Ok(())
 }
-
 
 pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
