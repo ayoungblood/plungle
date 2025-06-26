@@ -1,9 +1,10 @@
 // src/radios/qdmr_generic.rs
 
+use std::borrow::Cow;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::OnceLock;
-use saphyr::{Yaml, LoadableYamlNode, YamlEmitter, Scalar, Sequence, Mapping};
+use saphyr::{Yaml, LoadableYamlNode, YamlEmitter, Scalar, Sequence, Mapping, Tag};
 use pretty_yaml::{config::FormatOptions, format_text};
 
 use crate::*;
@@ -623,7 +624,7 @@ fn write_channels<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequence<'a>,
                         Some(TxPermit::Always) => "Always",
                         Some(TxPermit::ChannelFree) => "Free",
                         Some(TxPermit::CtcssDcsDifferent) => "Tone", // @TODO: verify this
-                        _ => return Err("Unknown TX permit for FM channel".into()), // @TODO: handle this gracefully
+                        _ => "Always", // @TODO: handle this better?
                     }.into()))),
                     (Yaml::Value(Scalar::String("bandwidth".into())), Yaml::Value(Scalar::String(match channel.fm.as_ref().unwrap().bandwidth.khz() {
                         25.0 => "Wide",
@@ -632,7 +633,13 @@ fn write_channels<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequence<'a>,
                     }.into()))),
                     (Yaml::Value(Scalar::String("power".into())), write_power(&channel.power)),
                     (Yaml::Value(Scalar::String("timeout".into())), write_timeout(&channel.tx_tot)),
-                    (Yaml::Value(Scalar::String("vox".into())), Yaml::Value(Scalar::String("".into()))), // @TODO: tag this (!<!default>)
+                    (Yaml::Value(Scalar::String("vox".into())), Yaml::Tagged(
+                        Cow::Owned(Tag {
+                            handle: "!".to_string(),
+                            suffix: "<!default>".to_string(),
+                        }),
+                        Box::new(Yaml::Value(Scalar::String("".into())))
+                    )),
                     (Yaml::Value(Scalar::String("squelch".into())), write_squelch(&channel.fm.as_ref().unwrap().squelch)),
                 ]);
                 channel_map.insert(
