@@ -540,20 +540,130 @@ fn write_talkgroups<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequence<'a
     Ok(contacts_vec)
 }
 
-fn write_talkgroup_lists(opt: &Opt) -> Result<Sequence, Box<dyn Error>> {
+fn write_talkgroup_lists<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequence<'a>, Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
     uprintln!(opt, Stderr, None, 1, "Building groupLists YAML");
 
-    let talkgroup_lists_vec = Sequence::new();
+    let mut group_lists_vec = Sequence::new();
+    if !codeplug.talkgroup_lists.is_empty() {
+        for (ii, talkgroup_list) in codeplug.talkgroup_lists.iter().enumerate() {
+            let group_list_map = Mapping::from_iter([
+                (Yaml::Value(Scalar::String("id".into())), Yaml::Value(Scalar::String(format!("grp{}", ii + 1).into()))),
+                (Yaml::Value(Scalar::String("name".into())), Yaml::Value(Scalar::String(talkgroup_list.name.clone().into()))),
+                (Yaml::Value(Scalar::String("contacts".into())), Yaml::Sequence(
+                    talkgroup_list.talkgroups.iter().map(|tg| {
+                        Yaml::Value(Scalar::String(format!("cont{}", tg.index + 1).into()))
+                    }).collect()
+                )),
+            ]);
+            group_lists_vec.push(Yaml::Mapping(group_list_map));
+        }
+    }
 
-    Ok(talkgroup_lists_vec)
+    Ok(group_lists_vec)
 }
 
-fn write_channels(opt: &Opt) -> Result<Sequence, Box<dyn Error>> {
+fn write_power(power: &Power) -> Yaml {
+    if let Power::Watts(watts) = power {
+        if *watts >= 7.0 {
+            Yaml::Value(Scalar::String("Max".into()))
+        } else if *watts >= 5.0 {
+            Yaml::Value(Scalar::String("High".into()))
+        } else if *watts >= 2.5 {
+            Yaml::Value(Scalar::String("Mid".into()))
+        } else if *watts >= 1.0 {
+            Yaml::Value(Scalar::String("Low".into()))
+        } else if *watts >= 0.5 {
+            Yaml::Value(Scalar::String("Min".into()))
+        } else {
+            Yaml::Value(Scalar::String("Min".into()))
+        }
+    } else if Power::default() == *power {
+        Yaml::Value(Scalar::String("".into())) // @TODO: tag this (!<!default>)
+    } else {
+        Yaml::Value(Scalar::String("Unknown".into())) // @TODO: handle this gracefully
+    }
+}
+
+fn write_timeout(timeout: &Timeout) -> Yaml {
+    match timeout {
+        Timeout::Infinite => Yaml::Value(Scalar::Integer(0)), // @TODO: tag this (!<!default>)
+        Timeout::Seconds(seconds) => Yaml::Value(Scalar::Integer(*seconds as i64)),
+        Timeout::Default => Yaml::Value(Scalar::String("".into())), // @TODO: tag this (!<!default>)
+    }
+}
+
+fn write_squelch(squelch: &Squelch) -> Yaml {
+    match squelch {
+        Squelch::Percent(percent) => Yaml::Value(Scalar::Integer((*percent / 10).into())),
+        Squelch::Default => Yaml::Value(Scalar::String("".into())), // @TODO: tag this (!<!default>)
+    }
+}
+
+fn write_channels<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequence<'a>, Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}:{}()", file!(), line!(),function!());
     uprintln!(opt, Stderr, None, 1, "Building channels YAML");
 
-    let channels_vec = Sequence::new();
+    let mut channels_vec = Sequence::new();
+    for (ii, channel) in codeplug.channels.iter().enumerate() {
+        // common fields
+        let mut fields_vec = vec![
+            (Yaml::Value(Scalar::String("id".into())), Yaml::Value(Scalar::String(format!("ch{}", ii + 1).into()))),
+            (Yaml::Value(Scalar::String("name".into())), Yaml::Value(Scalar::String(channel.name.clone().into()))),
+            (Yaml::Value(Scalar::String("rxFrequency".into())), Yaml::Value(Scalar::FloatingPoint(channel.frequency_rx.mhz().into()))),
+            (Yaml::Value(Scalar::String("txFrequency".into())), Yaml::Value(Scalar::FloatingPoint(channel.frequency_tx.mhz().into()))),
+            (Yaml::Value(Scalar::String("rxOnly".into())), Yaml::Value(Scalar::Boolean(channel.rx_only))),
+        ];
+        let mut channel_map = Mapping::new();
+        // set mode-specific fields and then add iter with the correct key (analog, digital) to the channel_map
+        match channel.mode {
+            ChannelMode::FM => {
+                fields_vec.extend(vec![
+                    (Yaml::Value(Scalar::String("admit".into())), Yaml::Value(Scalar::String(match channel.tx_permit {
+                        Some(TxPermit::Always) => "Always",
+                        Some(TxPermit::ChannelFree) => "Free",
+                        Some(TxPermit::CtcssDcsDifferent) => "Tone", // @TODO: verify this
+                        _ => return Err("Unknown TX permit for FM channel".into()), // @TODO: handle this gracefully
+                    }.into()))),
+                    (Yaml::Value(Scalar::String("bandwidth".into())), Yaml::Value(Scalar::String(match channel.fm.as_ref().unwrap().bandwidth.khz() {
+                        25.0 => "Wide",
+                        12.5 => "Narrow",
+                        _ => return Err("Unknown bandwidth for FM channel".into()), // @TODO: handle this gracefully
+                    }.into()))),
+                    (Yaml::Value(Scalar::String("power".into())), write_power(&channel.power)),
+                    (Yaml::Value(Scalar::String("timeout".into())), write_timeout(&channel.tx_tot)),
+                    (Yaml::Value(Scalar::String("vox".into())), Yaml::Value(Scalar::String("".into()))), // @TODO: tag this (!<!default>)
+                    (Yaml::Value(Scalar::String("squelch".into())), write_squelch(&channel.fm.as_ref().unwrap().squelch)),
+                ]);
+                channel_map.insert(
+                    Yaml::Value(Scalar::String("analog".into())),
+                    Yaml::Mapping(Mapping::from_iter(fields_vec)),
+                );
+            },
+            ChannelMode::DMR => {
+                fields_vec.extend(vec![
+                    (Yaml::Value(Scalar::String("admit".into())), Yaml::Value(Scalar::String(match channel.tx_permit {
+                        Some(TxPermit::Always) => "Always",
+                        Some(TxPermit::ChannelFree) => "Free",
+                        Some(TxPermit::ColorCodeSame) => "ColorCode",
+                        _ => "Unknown", // @TODO: handle this better
+                    }.into()))),
+                    (Yaml::Value(Scalar::String("colorCode".into())), Yaml::Value(Scalar::Integer(channel.dmr.as_ref().unwrap().color_code as i64))),
+                    (Yaml::Value(Scalar::String("timeSlot".into())), Yaml::Value(Scalar::String(format!("TS{}", channel.dmr.as_ref().unwrap().timeslot).into()))),
+                ]);
+                channel_map.insert(
+                    Yaml::Value(Scalar::String("digital".into())),
+                    Yaml::Mapping(Mapping::from_iter(fields_vec)),
+                );
+            },
+            _ => {
+                uprintln!(opt, Stderr, THEME.err, None, "Unknown channel mode: {:?}", channel.mode);
+                continue; // skip this channel
+            },
+        }
+        // common fields
+        channels_vec.push(Yaml::Mapping(channel_map));
+    }
 
     Ok(channels_vec)
 }
@@ -605,13 +715,13 @@ pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<()
     // add the talkgroup lists vec
     yaml_map.insert(
         Yaml::Value(Scalar::String("groupLists".into())),
-        Yaml::Sequence(write_talkgroup_lists(opt)?),
+        Yaml::Sequence(write_talkgroup_lists(opt, codeplug)?),
     );
 
     // add the channels vec
     yaml_map.insert(
         Yaml::Value(Scalar::String("channels".into())),
-        Yaml::Sequence(write_channels(opt)?),
+        Yaml::Sequence(write_channels(opt, codeplug)?),
     );
 
     // add the zones vec
