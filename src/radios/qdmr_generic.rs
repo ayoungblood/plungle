@@ -564,6 +564,25 @@ fn write_talkgroup_lists<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequen
     Ok(group_lists_vec)
 }
 
+fn write_admit(tx_permit: &Option<TxPermit>) -> Yaml {
+    match tx_permit {
+        Some(TxPermit::Always) => Yaml::Value(Scalar::String("Always".into())),
+        Some(TxPermit::ChannelFree) => Yaml::Value(Scalar::String("Free".into())),
+        Some(TxPermit::CtcssDcsDifferent) => Yaml::Value(Scalar::String("Tone".into())), // @TODO: verify this
+        Some(TxPermit::ColorCodeSame) => Yaml::Value(Scalar::String("ColorCode".into())), // @TODO: verify this
+        Some(TxPermit::ColorCodeDifferent) => Yaml::Value(Scalar::String("unknown".into())), // @TODO: handle this better
+        None => Yaml::Value(Scalar::String("unknown".into())), // @TODO: handle this gracefully
+    }
+}
+
+fn write_bandwidth(bandwidth: &Frequency) -> Yaml {
+    match bandwidth.khz() {
+        25.0 => Yaml::Value(Scalar::String("Wide".into())),
+        12.5 => Yaml::Value(Scalar::String("Narrow".into())),
+        _ => Yaml::Value(Scalar::String("Unknown".into())), // @TODO: handle this gracefully
+    }
+}
+
 fn write_power(power: &Power) -> Yaml {
     if let Power::Watts(watts) = power {
         if *watts >= 7.0 {
@@ -580,7 +599,13 @@ fn write_power(power: &Power) -> Yaml {
             Yaml::Value(Scalar::String("Min".into()))
         }
     } else if Power::default() == *power {
-        Yaml::Value(Scalar::String("".into())) // @TODO: tag this (!<!default>)
+        Yaml::Tagged(
+            Cow::Owned(Tag {
+                handle: "!".to_string(),
+                suffix: "<!default>".to_string(),
+            }),
+            Box::new(Yaml::Value(Scalar::String("".into())))
+        )
     } else {
         Yaml::Value(Scalar::String("Unknown".into())) // @TODO: handle this gracefully
     }
@@ -588,16 +613,28 @@ fn write_power(power: &Power) -> Yaml {
 
 fn write_timeout(timeout: &Timeout) -> Yaml {
     match timeout {
-        Timeout::Infinite => Yaml::Value(Scalar::Integer(0)), // @TODO: tag this (!<!default>)
+        Timeout::Infinite => Yaml::Value(Scalar::Integer(0)),
         Timeout::Seconds(seconds) => Yaml::Value(Scalar::Integer(*seconds as i64)),
-        Timeout::Default => Yaml::Value(Scalar::String("".into())), // @TODO: tag this (!<!default>)
+        Timeout::Default => Yaml::Tagged(
+            Cow::Owned(Tag {
+                handle: "!".to_string(),
+                suffix: "<!default>".to_string(),
+            }),
+            Box::new(Yaml::Value(Scalar::String("".into())))
+        ),
     }
 }
 
 fn write_squelch(squelch: &Squelch) -> Yaml {
     match squelch {
         Squelch::Percent(percent) => Yaml::Value(Scalar::Integer((*percent / 10).into())),
-        Squelch::Default => Yaml::Value(Scalar::String("".into())), // @TODO: tag this (!<!default>)
+        Squelch::Default => Yaml::Tagged(
+            Cow::Owned(Tag {
+                handle: "!".to_string(),
+                suffix: "<!default>".to_string(),
+            }),
+            Box::new(Yaml::Value(Scalar::String("".into())))
+        ), // @TODO: tag this (!<!default>)
     }
 }
 
@@ -614,23 +651,14 @@ fn write_channels<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequence<'a>,
             (Yaml::Value(Scalar::String("rxFrequency".into())), Yaml::Value(Scalar::FloatingPoint(channel.frequency_rx.mhz().into()))),
             (Yaml::Value(Scalar::String("txFrequency".into())), Yaml::Value(Scalar::FloatingPoint(channel.frequency_tx.mhz().into()))),
             (Yaml::Value(Scalar::String("rxOnly".into())), Yaml::Value(Scalar::Boolean(channel.rx_only))),
+            (Yaml::Value(Scalar::String("admit".into())), write_admit(&channel.tx_permit)),
         ];
         let mut channel_map = Mapping::new();
         // set mode-specific fields and then add iter with the correct key (analog, digital) to the channel_map
         match channel.mode {
             ChannelMode::FM => {
                 fields_vec.extend(vec![
-                    (Yaml::Value(Scalar::String("admit".into())), Yaml::Value(Scalar::String(match channel.tx_permit {
-                        Some(TxPermit::Always) => "Always",
-                        Some(TxPermit::ChannelFree) => "Free",
-                        Some(TxPermit::CtcssDcsDifferent) => "Tone", // @TODO: verify this
-                        _ => "Always", // @TODO: handle this better?
-                    }.into()))),
-                    (Yaml::Value(Scalar::String("bandwidth".into())), Yaml::Value(Scalar::String(match channel.fm.as_ref().unwrap().bandwidth.khz() {
-                        25.0 => "Wide",
-                        12.5 => "Narrow",
-                        _ => return Err("Unknown bandwidth for FM channel".into()), // @TODO: handle this gracefully
-                    }.into()))),
+                    (Yaml::Value(Scalar::String("bandwidth".into())), write_bandwidth(&channel.fm.as_ref().unwrap().bandwidth)),
                     (Yaml::Value(Scalar::String("power".into())), write_power(&channel.power)),
                     (Yaml::Value(Scalar::String("timeout".into())), write_timeout(&channel.tx_tot)),
                     (Yaml::Value(Scalar::String("vox".into())), Yaml::Tagged(
@@ -649,12 +677,6 @@ fn write_channels<'a>(opt: &Opt, codeplug: &'a Codeplug) -> Result<Sequence<'a>,
             },
             ChannelMode::DMR => {
                 fields_vec.extend(vec![
-                    (Yaml::Value(Scalar::String("admit".into())), Yaml::Value(Scalar::String(match channel.tx_permit {
-                        Some(TxPermit::Always) => "Always",
-                        Some(TxPermit::ChannelFree) => "Free",
-                        Some(TxPermit::ColorCodeSame) => "ColorCode",
-                        _ => "Unknown", // @TODO: handle this better
-                    }.into()))),
                     (Yaml::Value(Scalar::String("colorCode".into())), Yaml::Value(Scalar::Integer(channel.dmr.as_ref().unwrap().color_code as i64))),
                     (Yaml::Value(Scalar::String("timeSlot".into())), Yaml::Value(Scalar::String(format!("TS{}", channel.dmr.as_ref().unwrap().timeslot).into()))),
                 ]);
@@ -753,11 +775,10 @@ pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<()
     let mut yaml_str = String::new();
     let mut emitter = YamlEmitter::new(&mut yaml_str);
     emitter.compact(true);
-    println!("{:?}", emitter.is_compact());
     emitter.dump(&yaml)?;
 
     // @TODO remove me
-    println!("{}", yaml_str);
+    //println!("{}", yaml_str);
 
     // Write the YAML string to the output file
     std::fs::write(output_path, yaml_str)?;
