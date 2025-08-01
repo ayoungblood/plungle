@@ -4,6 +4,7 @@ mod ailunce_hd1;
 mod alinco_djmd5t;
 mod anytone_x78;
 mod chirp_generic;
+mod cpeditor_radioddity;
 mod opengd77_rt3s;
 mod tyt_mduv390;
 
@@ -22,6 +23,7 @@ pub fn parse_codeplug(opt: &Opt, model: &String, input: &PathBuf) -> Result<Code
     read_functions.insert("alinco_djmd5t", alinco_djmd5t::read);
     read_functions.insert("anytone_x78", anytone_x78::read);
     read_functions.insert("chirp_generic", chirp_generic::read);
+    read_functions.insert("cpeditor_radioddity", cpeditor_radioddity::read);
     read_functions.insert("opengd77_rt3s", opengd77_rt3s::read);
     read_functions.insert("tyt_mduv390", tyt_mduv390::read);
 
@@ -38,21 +40,22 @@ pub fn parse_codeplug(opt: &Opt, model: &String, input: &PathBuf) -> Result<Code
     }
 }
 
-pub fn generate_codeplug(opt: &Opt, codeplug: &Codeplug, model: &String, output: &PathBuf) -> Result<(), Box<dyn Error>> {
+pub fn generate_codeplug(opt: &Opt, codeplug: &Codeplug, model: &String, output: &PathBuf, donor: &Option<PathBuf>) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     // build up a hashmap of function pointers
-    let mut write_functions: HashMap<&str, fn(&Opt, &Codeplug, &PathBuf) -> Result<(), Box<dyn Error>>>
+    let mut write_functions: HashMap<&str, fn(&Opt, &Codeplug, &PathBuf, &Option<PathBuf>) -> Result<(), Box<dyn Error>>>
         = HashMap::new();
     write_functions.insert("ailunce_hd1", ailunce_hd1::write);
     write_functions.insert("alinco_djmd5t", alinco_djmd5t::write);
     write_functions.insert("anytone_x78", anytone_x78::write);
     write_functions.insert("chirp_generic", chirp_generic::write);
+    write_functions.insert("cpeditor_radioddity", cpeditor_radioddity::write);
     write_functions.insert("opengd77_rt3s", opengd77_rt3s::write);
     write_functions.insert("tyt_mduv390", tyt_mduv390::write);
 
     // look up the radio model in the hashmap
     if let Some(write_function) = write_functions.get(model.as_str()) {
-        return write_function(opt, codeplug, output);
+        return write_function(opt, codeplug, output, donor);
     } else {
         uprintln!(opt, Stderr, THEME.err, None, "Unsupported radio model for operation write: {}", model);
         uprintln!(opt, Stderr, None, None, "Operation \"write\" supports the following radio models:");
@@ -72,6 +75,7 @@ pub fn get_properties(opt: &Opt, model: &String) -> Result<structures::RadioProp
     properties_functions.insert("alinco_djmd5t", alinco_djmd5t::get_props);
     properties_functions.insert("anytone_x78", anytone_x78::get_props);
     properties_functions.insert("chirp_generic", chirp_generic::get_props);
+    properties_functions.insert("cpeditor_radioddity", cpeditor_radioddity::get_props);
     properties_functions.insert("opengd77_rt3s", opengd77_rt3s::get_props);
     properties_functions.insert("tyt_mduv390", tyt_mduv390::get_props);
 

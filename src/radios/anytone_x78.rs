@@ -1109,7 +1109,7 @@ pub fn write_radio_id_list(opt: &Opt, codeplug: &Codeplug, path: &PathBuf) -> Re
     Ok(())
 }
 
-pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
+pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf, _donor_path: &Option<PathBuf>) -> Result<(), Box<dyn Error>> {
     uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
     uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
 

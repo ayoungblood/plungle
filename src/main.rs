@@ -85,6 +85,8 @@ enum Commands {
         input: PathBuf,
         /// Output path
         output: PathBuf,
+        /// Donor path
+        donor: Option<PathBuf>,
     },
     /// Merge codeplugs
     Merge {
@@ -198,7 +200,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // write intermediary file
             write_codeplug(&opt, &output, &codeplug)?;
         }
-        Some(Commands::Generate { model, input, output }) => {
+        Some(Commands::Generate { model, input, output, donor }) => {
             // read intermediary file
             let mut codeplug = read_codeplug(&opt, &input)?;
             // filter codeplug
@@ -206,7 +208,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // validate codeplug
             validate::validate_codeplug(&opt, &codeplug, Some(&model))?;
             // generate codeplug
-            radios::generate_codeplug(&opt, &codeplug, &model, &output)?;
+            radios::generate_codeplug(&opt, &codeplug, &model, &output, &donor)?;
         }
         Some(Commands::Merge { inputs }) => {
             // merge codeplugs
