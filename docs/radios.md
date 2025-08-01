@@ -6,6 +6,7 @@ For an overview of current support, see the [README](../README.md). For model-sp
 * [alinco_djmd5t](radios/alinco_djmd5t.md)
 * [anytone_x78](radios/anytone_x78.md)
 * [chirp_generic](radios/chirp_generic.md)
+* [cpeditor_radioddity](radios/cpeditor_radioddity.md)
 * [opengd77_rt3s](radios/opengd77_rt3s.md)
 * [tyt_mduv390](radios/tyt_mduv390.md)
 
