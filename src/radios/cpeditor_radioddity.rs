@@ -11,6 +11,7 @@ use std::io::Read;
 
 use crate::*;
 use crate::structures::*;
+use crate::frequency::*;
 
 static PROPS: OnceLock<structures::RadioProperties> = OnceLock::new();
 pub fn get_props() -> &'static structures::RadioProperties {
@@ -60,20 +61,128 @@ fn parse_talkgroup_json(json: &Value) -> Result<DmrTalkgroup, Box<dyn Error>> {
     Ok(talkgroup)
 }
 
-fn parse_talkgroup_list_json(json: &Value) -> Result<DmrTalkgroupList, Box<dyn Error>> {
+fn parse_talkgroup_list_json(idx: usize,json: &Value, codeplug: &Codeplug) -> Result<DmrTalkgroupList, Box<dyn Error>> {
     let mut talkgroup_list = DmrTalkgroupList {
-        index: 0,
+        index: idx,
         name: json["Name"].as_str().unwrap_or("").to_string(),
         talkgroups: Vec::new(),
     };
 
     if let Some(contact_indices) = json["Contacts"].as_array() {
         for contact_index in contact_indices {
-            println!("{:?}", contact_index);
+            // get talkgroup by index and add it to the list
+            let talkgroup = codeplug.talkgroups.iter().find(|tg| tg.index == contact_index.as_u64().unwrap_or(0) as usize);
+            if let Some(talkgroup) = talkgroup {
+                talkgroup_list.talkgroups.push(talkgroup.clone());
+            }
         }
     }
 
     Ok(talkgroup_list)
+}
+
+fn parse_scan_list_json(index: usize, json: &Value) -> Result<ScanList, Box<dyn Error>> {
+    let scan_list = ScanList {
+        index: index,
+        name: json["Name"].as_str().unwrap().to_string(),
+        channels: Vec::new(),
+    };
+
+    Ok(scan_list)
+}
+
+fn parse_tone(type_str: &str, tone_str: &str) -> Option<Tone> {
+    match type_str {
+        "CTCSS" => Some(Tone::Ctcss(tone_str.parse::<f64>().ok()?)),
+        "DCS" => Some(Tone::Dcs(format!("D{:>03}N", tone_str.parse::<u32>().ok()?))),
+        "DCS Invert" => Some(Tone::Dcs(format!("D{:>03}I", tone_str.parse::<u32>().ok()?))),
+        _ => None,
+    }
+}
+
+fn parse_channel_json(channel_json: &Value, codeplug: &Codeplug) -> Option<Channel> {
+    let mut channel = Channel::default();
+    // mode-common fields
+    channel.index = channel_json["ID"].as_u64().unwrap() as usize;
+    channel.name = channel_json["Name"].as_str().unwrap().to_string();
+    channel.frequency_rx = Frequency::from_hz(channel_json["Rx Freq"].as_u64().unwrap() as f64);
+    channel.frequency_tx = Frequency::from_hz(channel_json["Tx Freq"].as_u64().unwrap() as f64);
+    channel.power = match channel_json["Tx Power"].as_str().unwrap() {
+        // @TODO this is specific to DB25-D, may need to be adjusted for other radios
+        "LOW" => Power::Watts(5.0),
+        "HIGH" => Power::Watts(20.0),
+        _ => Power::Watts(1.0),
+    };
+    channel.rx_only = channel_json["Rx only"].as_str().unwrap() == "ON";
+    channel.tx_permit = match channel_json["TX Policy"].as_str().unwrap() {
+        "POLITE_TO_ALL" => Some(TxPermit::ChannelFree),
+        "POLITE_TO_CC" => Some(TxPermit::ColorCodeSame), // @TODO verify this
+        "IMPOLITE" => Some(TxPermit::Always),
+        _ => None
+    };
+    // mode-specific fields
+    channel.mode = match channel_json["Type"].as_str().unwrap() {
+        "ANALOG" => ChannelMode::FM,
+        "DIGITAL" => ChannelMode::DMR,
+        _ => ChannelMode::AM,
+    };
+    if channel.mode == ChannelMode::FM {
+        channel.fm = Some(FmChannel {
+            bandwidth: Frequency::from_khz_str(channel_json["Bandwidth"].as_str().unwrap().strip_suffix("KHz").unwrap()).unwrap(),
+            squelch: Squelch::Default,
+            tone_rx: parse_tone(
+                channel_json["Tone Type Rx"].as_str().unwrap_or(""),
+                channel_json["Tone Rx"].as_str().unwrap_or("")),
+            tone_tx: parse_tone(
+                channel_json["Tone Type Tx"].as_str().unwrap_or(""),
+                channel_json["Tone Tx"].as_str().unwrap_or("")),
+        });
+    } else if channel.mode == ChannelMode::DMR {
+        let contact_id = channel_json["Default Contact ID"].as_u64().unwrap() as usize;
+        let group_list_id = channel_json["Group call list"].as_u64().unwrap() as usize;
+        channel.dmr = Some(DmrChannel {
+            // @TODO FIXME cpeditor supports different Tx/Rx timeslots, for now we only parse the TX timeslot
+            timeslot: channel_json["TS Tx"].as_str().unwrap().strip_prefix("TS").unwrap().parse::<u8>().unwrap(),
+            // @TODO FIXME cpeditor supports different Tx/Rx color codes, for now we only parse the TX color code
+            color_code: channel_json["TX CC"].as_u64().unwrap() as u8,
+            talkgroup: if contact_id > 0 {
+                // index into codeplug.talkgroups with contact_id
+                codeplug.talkgroups.get(contact_id - 1).map(|tg| tg.name.clone())
+            } else {
+                None
+            },
+            talkgroup_list: if group_list_id > 0 {
+                // index into codeplug.talkgroup_lists with group_list_id
+                codeplug.talkgroup_lists.get(group_list_id - 1).map(|tgl| tgl.name.clone())
+            } else {
+                None
+            },
+            id_name: None,
+        });
+    }
+    Some(channel)
+}
+
+fn parse_zone_json(zone_json: &Value, codeplug: &mut Codeplug) {
+    let index = zone_json["ID"].as_u64().unwrap() as usize;
+    let name = zone_json["Name"].as_str().unwrap_or("").to_string();
+    let mut zone = Zone {
+        index,
+        name,
+        channels: Vec::new(),
+    };
+
+    // add channels to channels first, then add to zone
+    if let Some(channels_json) = zone_json["Channels"].as_array() {
+        for channel_json in channels_json {
+            if let Some(channel) = parse_channel_json(channel_json, codeplug) {
+                zone.channels.push(channel.name.clone());
+                codeplug.channels.push(channel);
+            }
+        }
+    }
+
+    codeplug.zones.push(zone);
 }
 
 pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>> {
@@ -115,9 +224,24 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
 
     // parse talkgroup lists
     if let Some(rx_groups) = json["RX groups"].as_array() {
-        for rx_group in rx_groups {
-            let talkgroup_list = parse_talkgroup_list_json(rx_group)?;
+        for (ii, rx_group) in rx_groups.iter().enumerate() {
+            let talkgroup_list = parse_talkgroup_list_json(ii + 1, rx_group, &codeplug)?;
             codeplug.talkgroup_lists.push(talkgroup_list);
+        }
+    }
+
+    // parse scan list names so channels can reference them
+    if let Some(scan_lists) = json["Scan lists"].as_array() {
+        for (ii, scan_list) in scan_lists.iter().enumerate() {
+            let scan_list = parse_scan_list_json(ii + 1, scan_list)?;
+            codeplug.scanlists.push(scan_list);
+        }
+    }
+
+    // cpeditor is "zone-first", so we parse zones and channels simultaneously
+    if let Some(zones) = json["Zones"].as_array() {
+        for zone in zones.iter() {
+            parse_zone_json(zone, &mut codeplug);
         }
     }
     Ok(codeplug)
