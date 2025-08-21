@@ -88,6 +88,15 @@ fn parse_scan_list_json(index: usize, json: &Value) -> Result<ScanList, Box<dyn 
         channels: Vec::new(),
     };
 
+    if let Some(channels) = json["Selected channels"].as_array() {
+        for channel in channels {
+            // scan lists store channels as Group and Channel indices
+            let _group_id = channel["Group"].as_u64().unwrap();
+            let _channel_id = channel["Channel"].as_u64().unwrap();
+            // @TODO get channel name from group and channel ID
+        }
+    }
+
     Ok(scan_list)
 }
 
@@ -103,6 +112,7 @@ fn parse_tone(type_str: &str, tone_str: &str) -> Option<Tone> {
 fn parse_channel_json(channel_json: &Value, codeplug: &Codeplug) -> Option<Channel> {
     let mut channel = Channel::default();
     // mode-common fields
+    // @TODO add a static counter here so that channels have unique indices
     channel.index = channel_json["ID"].as_u64().unwrap() as usize;
     channel.name = channel_json["Name"].as_str().unwrap().to_string();
     channel.frequency_rx = Frequency::from_hz(channel_json["Rx Freq"].as_u64().unwrap() as f64);
@@ -283,6 +293,11 @@ fn write_scanlists(opt: &Opt, codeplug: &Codeplug) -> Result<Value, Box<dyn Erro
     for zone in codeplug.zones.iter() {
         let scanlist = json!({
             "Name": zone.name.clone(),
+            "Talkback": "On",
+            "Scan TX Mode": "Current Channel",
+            "Appointed channel group ID": 0,
+            "Appointed channel channel ID": 0,
+            "Selected channels": [],
         });
         scanlists_json.as_array_mut().unwrap().push(scanlist);
     }
@@ -304,6 +319,32 @@ fn write_rx_groups(opt: &Opt, codeplug: &Codeplug) -> Result<Value, Box<dyn Erro
     }
 
     Ok(rx_groups_json)
+}
+
+fn write_tone(optional_tone: Option<Tone>) -> (String, String) {
+    if let Some(tone) = optional_tone {
+        match tone {
+            Tone::Ctcss(freq) => (
+                format!("CTCSS"),
+                format!("{:.1}", freq),
+            ),
+            Tone::Dcs(code) => {
+                if code.ends_with("I") {
+                    (
+                        "DCS Invert".to_string(),
+                        format!("{}", code.chars().filter(|c| c.is_digit(10)).collect::<String>().parse::<u64>().unwrap()),
+                    )
+                } else {
+                    (
+                        "DCS".to_string(),
+                        format!("{}", code.chars().filter(|c| c.is_digit(10)).collect::<String>().parse::<u64>().unwrap()),
+                    )
+                }
+            }
+        }
+    } else {
+        return ("OFF".to_string(), "0".to_string());
+    }
 }
 
 fn write_channel(opt: &Opt, channel: &Channel) -> Result<Value, Box<dyn Error>> {
@@ -328,13 +369,13 @@ fn write_channel(opt: &Opt, channel: &Channel) -> Result<Value, Box<dyn Error>> 
             },
             Power::Default => "HIGH",
         },
-        "Rx Only": if channel.rx_only {
+        "Rx only": if channel.rx_only {
             "ON"
         } else {
             "OFF"
         },
         "Alarm": "OFF",
-        "PROMPT": "OFF",
+        "Prompt": "OFF",
         "PCT": "PATCS",
     });
     // mode specific fields
@@ -353,33 +394,32 @@ fn write_channel(opt: &Opt, channel: &Channel) -> Result<Value, Box<dyn Error>> 
             channel_json["Default Contact ID"] = json!(0);
             channel_json["EAS"] = json!("OFF");
             channel_json["Bandwidth"] = json!("25KHz"); // @TODO FIXME
-            channel_json["Tone Type Tx"] = json!("DCS"); // @TODO FIXME
-            channel_json["Tone Tx"] = json!("17"); // @TODO FIXME
-            channel_json["Tone Type Rx"] = json!("DCS"); // @TODO FIXME
-            channel_json["Tone Rx"] = json!("17"); // @TODO FIXME
+            channel_json["Tone Type Tx"] = write_tone(channel.fm.as_ref().unwrap().tone_tx.clone()).0.into();
+            channel_json["Tone Tx"] = write_tone(channel.fm.as_ref().unwrap().tone_tx.clone()).1.into();
+            channel_json["Tone Type Rx"] = write_tone(channel.fm.as_ref().unwrap().tone_rx.clone()).0.into();
+            channel_json["Tone Rx"] = write_tone(channel.fm.as_ref().unwrap().tone_rx.clone()).1.into();
             channel_json["APRS Channel"] = json!(0);
             channel_json["Relay Monitor"] = json!("OFF");
             channel_json["Relay Mode"] = json!("OFF");
             channel_json["Encryption"] = json!(0);
-
         },
         ChannelMode::DMR => {
             channel_json["DMR Mode"] = json!("Double Slot");
-            channel_json["TS Rx"] = json!("TS1");
-            channel_json["TS Tx"] = json!("TS1");
-            channel_json["RX CC"] = json!(1);
-            channel_json["TX CC"] = json!(1);
+            channel_json["TS Rx"] = format!("TS{}", channel.dmr.as_ref().unwrap().timeslot).into();
+            channel_json["TS Tx"] = format!("TS{}", channel.dmr.as_ref().unwrap().timeslot).into();
+            channel_json["RX CC"] = json!(channel.dmr.as_ref().unwrap().color_code);
+            channel_json["TX CC"] = json!(channel.dmr.as_ref().unwrap().color_code);
             channel_json["MSG Type"] = json!("UNCONFIRMED");
             channel_json["TX Policy"] = json!("IMPOLITE"); // @TODO FIXME
             channel_json["Group call list"] = json!(0);
             channel_json["Scan List ID"] = json!(0); // @TODO FIXME
             channel_json["Default Contact ID"] = json!(0);
             channel_json["EAS"] = json!("OFF");
-            channel_json["Bandwidth"] = json!("25KHz"); // @TODO FIXME
-            channel_json["Tone Type Tx"] = json!("DCS"); // @TODO FIXME
-            channel_json["Tone Tx"] = json!("17"); // @TODO FIXME
-            channel_json["Tone Type Rx"] = json!("DCS"); // @TODO FIXME
-            channel_json["Tone Rx"] = json!("17"); // @TODO FIXME
+            channel_json["Bandwidth"] = json!("12.5KHz");
+            channel_json["Tone Type Tx"] = json!("OFF");
+            channel_json["Tone Tx"] = json!("0");
+            channel_json["Tone Type Rx"] = json!("OFF");
+            channel_json["Tone Rx"] = json!("0");
             channel_json["APRS Channel"] = json!(0);
             channel_json["Relay Monitor"] = json!("OFF");
             channel_json["Relay Mode"] = json!("OFF");
@@ -387,9 +427,6 @@ fn write_channel(opt: &Opt, channel: &Channel) -> Result<Value, Box<dyn Error>> 
         },
         _ => return Err("Unsupported channel mode".into()),
     }
-
-    channel_json["TS Rx"] = json!("TS1");
-    channel_json["TS Tx"] = json!("TS1");
 
     Ok(channel_json)
 }
