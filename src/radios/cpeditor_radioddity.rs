@@ -81,8 +81,8 @@ fn parse_talkgroup_list_json(idx: usize,json: &Value, codeplug: &Codeplug) -> Re
     Ok(talkgroup_list)
 }
 
-fn parse_scan_list_json(index: usize, json: &Value) -> Result<ScanList, Box<dyn Error>> {
-    let scan_list = ScanList {
+fn parse_scan_list_json(index: usize, json: &Value, codeplug_json: &Value) -> Result<ScanList, Box<dyn Error>> {
+    let mut scan_list = ScanList {
         index: index,
         name: json["Name"].as_str().unwrap().to_string(),
         channels: Vec::new(),
@@ -91,9 +91,12 @@ fn parse_scan_list_json(index: usize, json: &Value) -> Result<ScanList, Box<dyn 
     if let Some(channels) = json["Selected channels"].as_array() {
         for channel in channels {
             // scan lists store channels as Group and Channel indices
-            let _group_id = channel["Group"].as_u64().unwrap();
-            let _channel_id = channel["Channel"].as_u64().unwrap();
-            // @TODO get channel name from group and channel ID
+            let zone_id = channel["Group"].as_u64().unwrap();
+            let channel_id = channel["Channel"].as_u64().unwrap();
+            // find channel by zone and channel ids
+            let zone = codeplug_json["Zones"].as_array().unwrap().iter().find(|z| z["ID"].as_u64().unwrap() == zone_id).unwrap();
+            let channel = zone["Channels"].as_array().unwrap().iter().find(|c| c["ID"].as_u64().unwrap() == channel_id).unwrap();
+            scan_list.channels.push(channel["Name"].as_str().unwrap().to_string());
         }
     }
 
@@ -243,7 +246,7 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
     // parse scan list names so channels can reference them
     if let Some(scan_lists) = json["Scan lists"].as_array() {
         for (ii, scan_list) in scan_lists.iter().enumerate() {
-            let scan_list = parse_scan_list_json(ii + 1, scan_list)?;
+            let scan_list = parse_scan_list_json(ii + 1, scan_list, &json)?;
             codeplug.scanlists.push(scan_list);
         }
     }
