@@ -115,8 +115,10 @@ fn parse_tone(type_str: &str, tone_str: &str) -> Option<Tone> {
 fn parse_channel_json(channel_json: &Value, codeplug: &Codeplug) -> Option<Channel> {
     let mut channel = Channel::default();
     // mode-common fields
-    // @TODO add a static counter here so that channels have unique indices
-    channel.index = channel_json["ID"].as_u64().unwrap() as usize;
+    // channel ID is unique per zone but we need unique indices, so use an atomic counter
+    static CHANNEL_COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
+    let unique_index = CHANNEL_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    channel.index = unique_index;
     channel.name = channel_json["Name"].as_str().unwrap().to_string();
     channel.frequency_rx = Frequency::from_hz(channel_json["Rx Freq"].as_u64().unwrap() as f64);
     channel.frequency_tx = Frequency::from_hz(channel_json["Tx Freq"].as_u64().unwrap() as f64);
@@ -324,7 +326,7 @@ fn write_rx_groups(opt: &Opt, codeplug: &Codeplug) -> Result<Value, Box<dyn Erro
     Ok(rx_groups_json)
 }
 
-fn write_tone(optional_tone: Option<Tone>) -> (String, String) {
+fn write_tone(optional_tone: &Option<Tone>) -> (String, String) {
     if let Some(tone) = optional_tone {
         match tone {
             Tone::Ctcss(freq) => (
@@ -347,6 +349,27 @@ fn write_tone(optional_tone: Option<Tone>) -> (String, String) {
         }
     } else {
         return ("OFF".to_string(), "0".to_string());
+    }
+}
+
+fn write_tx_policy(tx_permit: &Option<TxPermit>) -> String {
+    match tx_permit {
+        Some(TxPermit::Always) => "IMPOLITE".to_string(),
+        Some(TxPermit::ChannelFree) => "POLITE_TO_ALL".to_string(),
+        Some(TxPermit::CtcssDcsDifferent) => "POLITE_TO_ALL".to_string(), // @TODO FIXME handle this better
+        Some(TxPermit::ColorCodeSame) => "POLITE_TO_CC".to_string(),
+        Some(TxPermit::ColorCodeDifferent) => "POLITE_TO_ALL".to_string(), // @TODO FIXME handle this better
+        None => "IMPOLITE".to_string(),
+    }
+}
+
+fn write_bandwidth(bandwidth: &Frequency) -> String {
+    if *bandwidth == Frequency::from_khz(25.0) {
+        "25KHz".to_string()
+    } else if *bandwidth == Frequency::from_khz(12.5) {
+        "12.5KHz".to_string()
+    } else {
+        format!("{}KHz", bandwidth.khz())
     }
 }
 
@@ -391,16 +414,16 @@ fn write_channel(opt: &Opt, channel: &Channel) -> Result<Value, Box<dyn Error>> 
             channel_json["RX CC"] = json!(1);
             channel_json["TX CC"] = json!(1);
             channel_json["MSG Type"] = json!("UNCONFIRMED");
-            channel_json["TX Policy"] = json!("IMPOLITE"); // @TODO FIXME
+            channel_json["TX Policy"] = write_tx_policy(&channel.tx_permit).into();
             channel_json["Group call list"] = json!(0);
             channel_json["Scan List ID"] = json!(0); // @TODO FIXME
             channel_json["Default Contact ID"] = json!(0);
             channel_json["EAS"] = json!("OFF");
-            channel_json["Bandwidth"] = json!("25KHz"); // @TODO FIXME
-            channel_json["Tone Type Tx"] = write_tone(channel.fm.as_ref().unwrap().tone_tx.clone()).0.into();
-            channel_json["Tone Tx"] = write_tone(channel.fm.as_ref().unwrap().tone_tx.clone()).1.into();
-            channel_json["Tone Type Rx"] = write_tone(channel.fm.as_ref().unwrap().tone_rx.clone()).0.into();
-            channel_json["Tone Rx"] = write_tone(channel.fm.as_ref().unwrap().tone_rx.clone()).1.into();
+            channel_json["Bandwidth"] = write_bandwidth(&channel.fm.as_ref().unwrap().bandwidth).into();
+            channel_json["Tone Type Tx"] = write_tone(&channel.fm.as_ref().unwrap().tone_tx).0.into();
+            channel_json["Tone Tx"] = write_tone(&channel.fm.as_ref().unwrap().tone_tx).1.into();
+            channel_json["Tone Type Rx"] = write_tone(&channel.fm.as_ref().unwrap().tone_rx).0.into();
+            channel_json["Tone Rx"] = write_tone(&channel.fm.as_ref().unwrap().tone_rx).1.into();
             channel_json["APRS Channel"] = json!(0);
             channel_json["Relay Monitor"] = json!("OFF");
             channel_json["Relay Mode"] = json!("OFF");
@@ -413,7 +436,7 @@ fn write_channel(opt: &Opt, channel: &Channel) -> Result<Value, Box<dyn Error>> 
             channel_json["RX CC"] = json!(channel.dmr.as_ref().unwrap().color_code);
             channel_json["TX CC"] = json!(channel.dmr.as_ref().unwrap().color_code);
             channel_json["MSG Type"] = json!("UNCONFIRMED");
-            channel_json["TX Policy"] = json!("IMPOLITE"); // @TODO FIXME
+            channel_json["TX Policy"] = write_tx_policy(&channel.tx_permit).into();
             channel_json["Group call list"] = json!(0);
             channel_json["Scan List ID"] = json!(0); // @TODO FIXME
             channel_json["Default Contact ID"] = json!(0);
