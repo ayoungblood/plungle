@@ -104,7 +104,7 @@ fn pretty_channel(_opt: &Opt, channel: &Channel) -> String {
         ChannelMode::DMR => {
             if channel.dmr.is_some() {
                 line.push_str(&format!(
-                    "slot={:1} color={:2} tg={:16} tgl={:16} id={}",
+                    "ts={:1} cc={:2} tg={} tgl={} id={}",
                     channel.dmr.clone().unwrap().timeslot,
                     channel.dmr.clone().unwrap().color_code,
                     if channel.dmr.clone().unwrap().talkgroup.is_some() {
