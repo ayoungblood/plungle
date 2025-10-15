@@ -7,8 +7,8 @@ use clap::ValueEnum;
 pub enum Format {
     #[default]
     Default,
+    Ods,
     Json,
-    Toml,
     Text,
 }
 
@@ -16,8 +16,8 @@ impl std::fmt::Display for Format {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Format::Default => write!(f, "default"),
+            Format::Ods => write!(f, "ODS"),
             Format::Json => write!(f, "JSON"),
-            Format::Toml => write!(f, "TOML"),
             Format::Text => write!(f, "text"),
         }
     }

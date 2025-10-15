@@ -12,6 +12,7 @@ mod printer;
 mod merge;
 mod filter;
 mod theme;
+mod ods;
 
 use clap::{Parser, Subcommand};
 use lazy_static::lazy_static;
@@ -111,8 +112,8 @@ fn read_codeplug(opt: &Opt, input_path: &PathBuf) -> Result<structures::Codeplug
     let format = match input_path.extension() {
         Some(ext) => {
             match ext.to_str().unwrap() {
+                "ods" => helpers::Format::Ods,
                 "json" => helpers::Format::Json,
-                "toml" => helpers::Format::Toml,
                 _ => opt.format.clone(),
             }
         }
@@ -123,9 +124,10 @@ fn read_codeplug(opt: &Opt, input_path: &PathBuf) -> Result<structures::Codeplug
     if format == helpers::Format::Json {
         if !opt.quiet { uprintln!(opt, Stderr, THEME.info, None, "Reading codeplug as JSON from: {:?}", input_path); }
         codeplug = serde_json::from_str(&std::fs::read_to_string(input_path)?)?;
-    } else if format == helpers::Format::Toml {
-        if !opt.quiet { uprintln!(opt, Stderr, THEME.info, None, "Reading codeplug as TOML from: {:?}", input_path); }
-        codeplug = toml::from_str(&std::fs::read_to_string(input_path)?)?;
+    } else if format == helpers::Format::Ods {
+        if !opt.quiet { uprintln!(opt, Stderr, THEME.info, None, "Reading codeplug as ODS from: {:?}", input_path); }
+        codeplug = structures::Codeplug::default();
+        uprintln!(opt, Stderr, THEME.info, None, "ODS import not yet implemented"); // @TODO remove me
     } else {
         uprintln!(opt, Stderr, THEME.err, None, "Unsupported codeplug format");
         return Err("Unsupported codeplug format".into());
@@ -145,8 +147,8 @@ fn write_codeplug(opt: &Opt, output_path: &Option<PathBuf>, codeplug: &structure
                     match path.extension() {
                         Some(ext) => {
                             match ext.to_str().unwrap() {
+                                "ods" => helpers::Format::Ods,
                                 "json" => helpers::Format::Json,
-                                "toml" => helpers::Format::Toml,
                                 "txt" => helpers::Format::Text,
                                 _ => opt.format.clone(),
                             }
@@ -160,20 +162,26 @@ fn write_codeplug(opt: &Opt, output_path: &Option<PathBuf>, codeplug: &structure
         _ => opt.format.clone(),
     };
     // serialize the codeplug to a string
-    let file_str = match format {
-        helpers::Format::Json => serde_json::to_string_pretty(codeplug)?,
-        helpers::Format::Toml => toml::to_string_pretty(codeplug)?,
-        helpers::Format::Text => printer::pretty(opt, codeplug)?,
-        helpers::Format::Default => printer::pretty(opt, codeplug)?,
-    };
+    if !opt.quiet { uprintln!(opt, Stderr, THEME.info, None, "Writing codeplug to {} (--format={})",
+        output_path.as_ref().map_or("stdout".to_string(), |path| path.display().to_string()), format); }
+    match format {
+        helpers::Format::Ods => {
+            ods::write(opt, codeplug, output_path)?;
+        },
+        helpers::Format::Json | helpers::Format::Text | helpers::Format::Default => {
+            // Generate format string
+            let content = match format {
+                helpers::Format::Json => serde_json::to_string_pretty(codeplug)?,
+                helpers::Format::Text | helpers::Format::Default => printer::pretty(opt, codeplug)?,
+                _ => unreachable!(), // Already handled above
+            };
 
-    // write to file or stdout
-    if output_path.is_none() {
-        if !opt.quiet { uprintln!(opt, Stderr, THEME.info, None, "Writing codeplug to stdout (--format={})", format); }
-        uprintln!(opt, Stdout, None, None, "{}", file_str);
-    } else {
-        if !opt.quiet { uprintln!(opt, Stderr, THEME.info, None, "Writing codeplug to {:?} (--format={})", output_path.as_ref().unwrap(), format); }
-        std::fs::write(output_path.as_ref().unwrap(), file_str)?;
+            // Write to stdout or file
+            match output_path.as_ref() {
+                Some(path) => std::fs::write(path, content)?,
+                None => uprintln!(opt, Stdout, None, None, "{}", content),
+            }
+        },
     }
 
     if !opt.quiet { uprintln!(opt, Stderr, Color::Cyan, None, "Codeplug has {} channels, {} zones, {} talkgroups, {} talkgroup lists",
