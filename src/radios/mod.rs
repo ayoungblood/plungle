@@ -6,6 +6,7 @@ mod anytone_x78;
 mod chirp_generic;
 mod opengd77_rt3s;
 mod tyt_mduv390;
+mod yaesu_ft3d;
 
 use std::error::Error;
 use std::collections::HashMap;
@@ -24,6 +25,7 @@ pub fn parse_codeplug(opt: &Opt, model: &String, input: &PathBuf) -> Result<Code
     read_functions.insert("chirp_generic", chirp_generic::read);
     read_functions.insert("opengd77_rt3s", opengd77_rt3s::read);
     read_functions.insert("tyt_mduv390", tyt_mduv390::read);
+    read_functions.insert("yaesu_ft3d", yaesu_ft3d::read);
 
     // look up the radio model in the hashmap
     if let Some(read_function) = read_functions.get(model.as_str()) {
@@ -74,6 +76,7 @@ pub fn get_properties(opt: &Opt, model: &String) -> Result<structures::RadioProp
     properties_functions.insert("chirp_generic", chirp_generic::get_props);
     properties_functions.insert("opengd77_rt3s", opengd77_rt3s::get_props);
     properties_functions.insert("tyt_mduv390", tyt_mduv390::get_props);
+    properties_functions.insert("yaesu_ft3d", yaesu_ft3d::get_props);
 
     // look up the radio model in the hashmap
     if let Some(properties_function) = properties_functions.get(model.as_str()) {
