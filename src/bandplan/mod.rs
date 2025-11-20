@@ -33,12 +33,14 @@ pub fn load_bandplan(opt: &Opt) -> Result<Bandplan, Box<dyn Error>> {
         let json_str = std::fs::read_to_string(&json_path)?;
         let mut bandplan: Bandplan = serde_json::from_str(&json_str)?;
         bandplan.source = Some(json_path.to_str().unwrap().to_string());
+        uprintln!(opt, Stderr, THEME.noise, None, "Loaded bandplan from {}", json_path.display());
         return Ok(bandplan);
     } else {
+        uprintln!(opt, Stderr, THEME.noise, None, "Searching for default bandplan");
         // otherwise, look for default_bandplan.json relative to the binary:
         // src/bandplan/default_bandplan.json (for development)
         // default_bandplan.json (for production)
-        let default_json_path = PathBuf::from("src/bandplan/default_bandplan.json");
+        let default_json_path = PathBuf::from("../src/bandplan/default_bandplan.json");
         if default_json_path.exists() {
             let json_str = std::fs::read_to_string(&default_json_path)?;
             let mut bandplan: Bandplan = serde_json::from_str(&json_str)?;

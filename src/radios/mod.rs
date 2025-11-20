@@ -51,6 +51,7 @@ pub fn generate_codeplug(opt: &Opt, codeplug: &Codeplug, model: &String, output:
     write_functions.insert("chirp_generic", chirp_generic::write);
     write_functions.insert("opengd77_rt3s", opengd77_rt3s::write);
     write_functions.insert("tyt_mduv390", tyt_mduv390::write);
+    write_functions.insert("yaesu_ft3d", yaesu_ft3d::write);
 
     // look up the radio model in the hashmap
     if let Some(write_function) = write_functions.get(model.as_str()) {

@@ -69,6 +69,8 @@ pub fn get_props() -> &'static structures::RadioProperties {
 
 type CsvRecord = Vec<String>;
 
+// READ ///////////////////////////////////////////////////////////////////////
+
 // returns (rx_tone, tx_tone)
 fn parse_tones(record: &CsvRecord) -> Result<(Option<Tone>, Option<Tone>), Box<dyn Error>> {
     // refer to Advanced Manual for squelch types
@@ -133,9 +135,9 @@ fn parse_channel_record(opt: &Opt, record: &CsvRecord) -> Result<Channel, Box<dy
             _ => ChannelMode::AM,
         };
         channel.power = match record[18].as_str() {
-            "L1" => Power::Watts(0.3),
-            "L2" => Power::Watts(1.0),
-            "L3" => Power::Watts(2.5),
+            "L1 (0.3W)" => Power::Watts(0.3),
+            "L2 (1W)" => Power::Watts(1.0),
+            "L3 (2.5W)" => Power::Watts(2.5),
             _ => Power::Watts(5.0),
         };
         channel.name = record[10].clone();
@@ -158,9 +160,6 @@ fn parse_channel_record(opt: &Opt, record: &CsvRecord) -> Result<Channel, Box<dy
             }
         }
     }
-
-
-
     Ok(channel)
 }
 
@@ -188,4 +187,134 @@ pub fn read(opt: &Opt, input_path: &PathBuf) -> Result<Codeplug, Box<dyn Error>>
         }
     }
     Ok(codeplug)
+}
+
+// WRITE //////////////////////////////////////////////////////////////////////
+
+fn write_tones(_opt: &Opt, channel: &Channel) -> Result<(String, String, String, String, String), Box<dyn Error>> {
+    // 11 Tone Mode: [OFF,TONE,TONE SQL,DCS,REV TONE,PR FREQ,PAGER]
+    // 12 CTCSS Frequency: [67.0 Hz,..,254.1 Hz]
+    // 13 DCS Code: [023,..,754] default 023
+    // 14 DCS Polarity: [RX Normal TX Normal,RX Invert TX Normal,RX Both TX Normal,RX Normal TX Invert,RX Invert TX Invert,RX Both TX Invert]
+    // 15 User CTCSS: default 1600 Hz
+    if channel.fm.is_some() {
+        let tone_tx = &channel.fm.as_ref().unwrap().tone_tx;
+        let tone_rx = &channel.fm.as_ref().unwrap().tone_rx;
+        // TX tone, no RX tone
+        if tone_tx.is_some() && tone_rx.is_none() {
+            match tone_tx.clone().unwrap() {
+                Tone::Ctcss(freq) => {
+                    let freq_str = format!("{:.1} Hz", freq);
+                    return Ok(("TONE".into(), freq_str, "023".into(), "RX Normal TX Normal".into(), "1600 Hz".into()));
+                }
+                Tone::Dcs(code) => {
+                    let code_str = format!("{:03}", code);
+                    return Ok(("DCS".into(), "OFF".into(), code_str, "RX Normal TX Normal".into(), "1600 Hz".into()));
+                }
+            }
+        }
+        // RX tone, no TX tone
+        if tone_rx.is_some() && tone_tx.is_none() {
+            match tone_rx.clone().unwrap() {
+                Tone::Ctcss(freq) => {
+                    let freq_str = format!("{:.1} Hz", freq);
+                    return Ok(("TONE SQL".into(), freq_str, "023".into(), "RX Normal TX Normal".into(), "1600 Hz".into()));
+                }
+                Tone::Dcs(code) => {
+                    let code_str = format!("{:03}", code);
+                    return Ok(("DCS".into(), "OFF".into(), code_str, "RX Normal TX Normal".into(), "1600 Hz".into()));
+                }
+            }
+        }
+    }
+    // default
+    Ok(("OFF".into(), "100.0 Hz".into(), "023".into(), "RX Normal TX Normal".into(), "1600 Hz".into()))
+}
+
+fn write_power(_opt: &Opt, channel: &Channel) -> Result<String, Box<dyn Error>> {
+    match channel.power {
+        Power::Default => {
+            return Ok("High".into());
+        }
+        Power::Watts(watts) => {
+            if watts >= 5.0 {
+                return Ok("High (5W)".into());
+            } else if watts >= 2.5 {
+                return Ok("L3 (2.5W)".into());
+            } else if watts >= 1.0 {
+                return Ok("L2 (1W)".into());
+            } else {
+                return Ok("L1 (0.3W)".into());
+            }
+        }
+    }
+}
+
+fn write_channels(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    // write to CSV
+    let mut writer = csv::WriterBuilder::new()
+        .from_path(output_path)?;
+    // there is no header, we just write the rows out
+    for channel in &codeplug.channels {
+        let offset: f64 = channel.frequency_tx.mhz() - channel.frequency_rx.mhz();
+        let (tone_mode, tone_ctcss, tone_dcs, tone_dcsp, tone_user_ctcss) = write_tones(opt, channel)?;
+        writer.write_record(&[
+            channel.index.to_string(),
+            "OFF".to_string(),
+            format!("{:.5}", channel.frequency_rx.mhz()), // Receive Frequency
+            format!("{:.5}", channel.frequency_tx.mhz()), // Transmit Frequency
+            format!("{:.5}", offset.abs()), // Offset Frequency
+            match offset {
+                0.0 => "-/+".to_string(),
+                offset if offset > 0.0 => "+RPT".to_string(),
+                offset if offset < 0.0 => "-RPT".to_string(),
+                _ => "OFF".to_string(),
+            }, // @TODO FIXME
+            "OFF".to_string(), // AUTO MODE
+            "FM".to_string(), // Operating Mode
+            "FM".to_string(), // DIG/ANALOG
+            "ON".to_string(), // TAG
+            channel.name.clone(), // Name
+            tone_mode,
+            tone_ctcss,
+            tone_dcs,
+            tone_dcsp,
+            tone_user_ctcss,
+            "RX 00".to_string(), // RX DG-ID
+            "TX 00".to_string(), // TX DG-ID
+            write_power(opt, channel)?, // TX Power
+            "OFF".to_string(), // SKIP
+            "ON".to_string(), // AUTO STEP
+            "5.0KHz".to_string(), // Step
+            "OFF".to_string(), // Memory Mask
+            "OFF".to_string(), // ATT
+            "OFF".to_string(), // S-Meter SQL
+            "OFF".to_string(), // Bell
+            "OFF".to_string(), // Narrow
+            "OFF".to_string(), // Clock Shift
+            "OFF".to_string(), // BANK1
+            "OFF".to_string(), // BANK2
+        ])?;
+    }
+    writer.flush()?;
+
+    Ok(())
+}
+
+pub fn write(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Result<(), Box<dyn Error>> {
+    uprintln!(opt, Stderr, THEME.trace, 2, "{}:{}()", file!(), function!());
+    uprintln!(opt, Stderr, None, 4, "props = {:?}", get_props());
+
+    // check if output path exists
+    if output_path.exists() {
+        return Err(format!("Output path already exists: {}", output_path.display()).into());
+    }
+
+    // write to CSV
+    write_channels(opt, &codeplug, &output_path)?;
+
+    Ok(())
 }
