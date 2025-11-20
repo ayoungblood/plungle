@@ -96,3 +96,20 @@ for file in $(ls $tempdir/output); do
 done
 # debug
 # meld ../fixtures/opengd77_rt3s/basic/ $tempdir/output
+
+printf "\n\x1b[4;36m[compare.sh] Testing Yaesu FT3D >>>>>>>>>>>>>>>>>>>>>>>>>>>>>\x1b[0m\n"
+rm -rf $tempdir/*
+# Parse FT3D fixture and write to output.json
+$target parse -q yaesu_ft3d ../fixtures/yaesu_ft3d/basic.csv $tempdir/output.json
+printf "\n[compare.sh] parse finished with return code $?\n"
+# Generate FT3D codeplug from output.json
+$target generate -q yaesu_ft3d $tempdir/output.json $tempdir/output.csv
+printf "\n[compare.sh] generate finished with return code $?\n\n"
+# Compare generated codeplug with original, file by file
+printf "[compare.sh] Comparing output.csv, ignoring line endings\n"
+file="output.csv"
+printf "[compare.sh] Comparing $file\n"
+diff --strip-trailing-cr $tempdir/$file ../fixtures/yaesu_ft3d/basic.csv
+printf "[compare.sh]     diff returned $?\n"
+# debug
+meld ../fixtures/yaesu_ft3d/basic.csv $tempdir/output.csv
