@@ -297,6 +297,30 @@ fn write_channels(opt: &Opt, codeplug: &Codeplug, output_path: &PathBuf) -> Resu
             "OFF".to_string(), // Clock Shift
             "OFF".to_string(), // BANK1
             "OFF".to_string(), // BANK2
+            "OFF".to_string(), // BANK3
+            "OFF".to_string(), // BANK4
+            "OFF".to_string(), // BANK5
+            "OFF".to_string(), // BANK6
+            "OFF".to_string(), // BANK7
+            "OFF".to_string(), // BANK8
+            "OFF".to_string(), // BANK9
+            "OFF".to_string(), // BANK10
+            "OFF".to_string(), // BANK11
+            "OFF".to_string(), // BANK12
+            "OFF".to_string(), // BANK13
+            "OFF".to_string(), // BANK14
+            "OFF".to_string(), // BANK15
+            "OFF".to_string(), // BANK16
+            "OFF".to_string(), // BANK17
+            "OFF".to_string(), // BANK18
+            "OFF".to_string(), // BANK19
+            "OFF".to_string(), // BANK20
+            "OFF".to_string(), // BANK21
+            "OFF".to_string(), // BANK22
+            "OFF".to_string(), // BANK23
+            "OFF".to_string(), // BANK24
+            "".to_string(),
+            "0".to_string(),
         ])?;
     }
     writer.flush()?;
